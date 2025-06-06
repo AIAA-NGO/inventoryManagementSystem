@@ -4,7 +4,6 @@ import com.example.inventoryManagementSystem.dto.request.PasswordUpdateRequest;
 import com.example.inventoryManagementSystem.model.User;
 import com.example.inventoryManagementSystem.repository.UserRepository;
 import com.example.inventoryManagementSystem.service.userDetailsService;
-import com.example.inventoryManagementSystem.service.user.UserDetailsImpl;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;

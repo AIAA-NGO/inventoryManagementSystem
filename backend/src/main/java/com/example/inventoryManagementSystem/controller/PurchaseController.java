@@ -22,8 +22,7 @@ public class PurchaseController {
     }
 
     @PostMapping
-    public ResponseEntity<PurchaseResponse> createPurchase(
-            @Valid @RequestBody PurchaseRequest request) {
+    public ResponseEntity<PurchaseResponse> createPurchase(@Valid @RequestBody PurchaseRequest request) {
         return ResponseEntity.ok(purchaseService.createPurchase(request));
     }
 
@@ -32,9 +31,10 @@ public class PurchaseController {
         return ResponseEntity.ok(purchaseService.getPurchaseById(id));
     }
 
+
     @PostMapping("/{id}/receive")
-    public ResponseEntity<PurchaseResponse> markAsReceived(@PathVariable Long id) {
-        return ResponseEntity.ok(purchaseService.markAsReceived(id));
+    public ResponseEntity<PurchaseResponse> receivePurchase(@PathVariable Long id) {
+        return ResponseEntity.ok(purchaseService.receivePurchase(id));
     }
 
     @DeleteMapping("/{id}")

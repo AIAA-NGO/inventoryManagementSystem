@@ -18,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -31,6 +32,8 @@ public class ProductServiceImpl implements ProductService {
     private final SupplierRepository supplierRepository;
     private final ModelMapper modelMapper;
 
+
+    //to be reviewed
     @Override
     @Transactional
     public ProductResponse createProduct(ProductRequest request) {
@@ -63,6 +66,7 @@ public class ProductServiceImpl implements ProductService {
         product.setCostPrice(request.getCostPrice());
         product.setQuantityInStock(request.getQuantityInStock());
         product.setLowStockThreshold(request.getLowStockThreshold());
+        product.setExpiryDate(request.getExpiryDate());
 
 
         product.setSupplier(supplier);
@@ -102,11 +106,12 @@ public class ProductServiceImpl implements ProductService {
         existingProduct.setCostPrice(request.getCostPrice());
         existingProduct.setQuantityInStock(request.getQuantityInStock());
         existingProduct.setLowStockThreshold(request.getLowStockThreshold());
+        existingProduct.setExpiryDate(request.getExpiryDate());
 
         if (request.getSupplierId() != null) {
             Supplier supplier = supplierRepository.findById(request.getSupplierId())
                     .orElseThrow(() -> new ResourceNotFoundException("Supplier not found with id: " + request.getSupplierId()));
-            existingProduct.setSupplier(supplier);
+//            existingProduct.setSupplier(supplier);
         }
 
         if (request.getCategoryId() != null) {
@@ -141,11 +146,17 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public List<ProductResponse> searchProducts(String query) {
-        List<Product> products = productRepository.searchProducts(query);
-        return products.stream()
+        if (query == null || query.trim().isEmpty()) {
+            return productRepository.findAll().stream()
+                    .map(this::mapToProductResponse)
+                    .collect(Collectors.toList());
+        }
+
+        return productRepository.searchProducts(query).stream()
                 .map(this::mapToProductResponse)
                 .collect(Collectors.toList());
     }
+
 
     @Override
     public List<ProductResponse> getLowStockProducts() {
@@ -222,7 +233,7 @@ public class ProductServiceImpl implements ProductService {
 
                 if (product.getSupplier() != null) {
                     row.createCell(cellNum++).setCellValue(product.getSupplier().getId());
-                    row.createCell(cellNum++).setCellValue(product.getSupplier().getName());
+                    row.createCell(cellNum++).setCellValue(product.getSupplier().getCompanyName());
                 } else {
                     cellNum += 2;
                 }
@@ -255,29 +266,6 @@ public class ProductServiceImpl implements ProductService {
         }
     }
 
-    private ProductResponse mapToProductResponse(Product product) {
-        return ProductResponse.builder()
-                .id(product.getId())
-                .name(product.getName())
-                .description(product.getDescription())
-                .sku(product.getSku())
-                .barcode(product.getBarcode())
-                .price(product.getPrice())
-                .costPrice(product.getCostPrice())
-                .quantityInStock(product.getQuantityInStock())
-                .lowStockThreshold(product.getLowStockThreshold())
-                .supplierId(product.getSupplier() != null ? product.getSupplier().getId() : null)
-                .supplierName(product.getSupplier() != null ? product.getSupplier().getName() : null)
-                .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
-                .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
-                .brandId(product.getBrand() != null ? product.getBrand().getId() : null)
-                .brandName(product.getBrand() != null ? product.getBrand().getName() : null)
-                .unitId(product.getUnit() != null ? product.getUnit().getId() : null)
-                .unitName(product.getUnit() != null ? product.getUnit().getName() : null)
-                .createdAt(product.getCreatedAt())
-                .updatedAt(product.getUpdatedAt())
-                .build();
-    }
 
     private String getCellStringValue(Cell cell) {
         if (cell == null) return null;
@@ -308,4 +296,115 @@ public class ProductServiceImpl implements ProductService {
                 return 0;
         }
     }
+
+    @Override
+    public List<ProductResponse> getProductsBySupplier(Long supplierId) {
+        List<Product> products = productRepository.findBySupplierId(supplierId);
+        return products.stream()
+                .map(product -> modelMapper.map(product, ProductResponse.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ProductResponse> getProductsByCategory(Long categoryId) {
+        List<Product> products = productRepository.findByCategoryId(categoryId);
+        return products.stream()
+                .map(product -> modelMapper.map(product, ProductResponse.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ProductResponse> getExpiringProducts(LocalDate thresholdDate) {
+        List<Product> products = productRepository.findByExpiryDateBefore(thresholdDate);
+        return products.stream()
+                .map(this::mapToProductResponse)
+                .collect(Collectors.toList());
+    }
+
+    private ProductResponse mapToProductResponse(Product product) {
+        return ProductResponse.builder()
+                .id(product.getId())
+                .name(product.getName())
+                .description(product.getDescription())
+                .sku(product.getSku())
+                .barcode(product.getBarcode())
+                .price(product.getPrice())
+                .costPrice(product.getCostPrice())
+                .quantityInStock(product.getQuantityInStock())
+                .lowStockThreshold(product.getLowStockThreshold())
+                .expiryDate(product.getExpiryDate())
+
+                // Supplier details
+//                .supplierId(product.getSupplier() != null ? product.getSupplier().getId() : null)
+//                .supplierName(product.getSupplier() != null ? product.getSupplier().getCompanyName() : null)
+//                .supplierContactPerson(product.getSupplier() != null ? product.getSupplier().getContactPerson() : null)
+//                .supplierEmail(product.getSupplier() != null ? product.getSupplier().getEmail() : null)
+//                .supplierPhone(product.getSupplier() != null ? product.getSupplier().getPhone() : null)
+//                .supplierAddress(product.getSupplier() != null ? product.getSupplier().getAddress() : null)
+//                .supplierWebsite(product.getSupplier() != null ? product.getSupplier().getWebsite() : null)
+
+                // Category details
+                .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
+                .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
+
+                // Brand details
+                .brandId(product.getBrand() != null ? product.getBrand().getId() : null)
+                .brandName(product.getBrand() != null ? product.getBrand().getName() : null)
+
+                // Unit details
+                .unitId(product.getUnit() != null ? product.getUnit().getId() : null)
+                .unitName(product.getUnit() != null ? product.getUnit().getName() : null)
+                .unitAbbreviation(product.getUnit() != null ? product.getUnit().getAbbreviation() : null)
+
+                // Timestamps
+                .createdAt(product.getCreatedAt())
+                .updatedAt(product.getUpdatedAt())
+                .build();
+    }
+
+    @Override
+    public ProductResponse deleteProductImage(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+
+        product.setImageData(null);
+        Product updatedProduct = productRepository.save(product);
+
+        // Manual mapping from Product to ProductResponse
+        return mapProductToResponse(updatedProduct);
+    }
+
+    private ProductResponse mapProductToResponse(Product product) {
+        ProductResponse response = new ProductResponse();
+        response.setId(product.getId());
+        response.setName(product.getName());
+        response.setDescription(product.getDescription());
+        response.setSku(product.getSku());
+        response.setBarcode(product.getBarcode());
+        response.setPrice(product.getPrice());
+        response.setCostPrice(product.getCostPrice());
+        response.setQuantityInStock(product.getQuantityInStock());
+        response.setLowStockThreshold(product.getLowStockThreshold());
+        response.setCreatedAt(product.getCreatedAt());
+        response.setUpdatedAt(product.getUpdatedAt());
+        response.setExpiryDate(product.getExpiryDate());
+        response.setImageData(product.getImageData()); // Will be null after deletion
+
+        // Map relationships (IDs only)
+        if (product.getSupplier() != null) {
+            response.setSupplierId(product.getSupplier().getId());
+        }
+        if (product.getCategory() != null) {
+            response.setCategoryId(product.getCategory().getId());
+        }
+        if (product.getBrand() != null) {
+            response.setBrandId(product.getBrand().getId());
+        }
+        if (product.getUnit() != null) {
+            response.setUnitId(product.getUnit().getId());
+        }
+
+        return response;
+    }
+
 }

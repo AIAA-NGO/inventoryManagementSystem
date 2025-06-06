@@ -58,10 +58,27 @@ public class CustomerServiceImpl implements CustomerService {
         customerRepository.deleteById(id);
     }
 
+    private CustomerResponse mapToCustomerResponse(Customer customer) {
+        return CustomerResponse.builder()
+                .id(customer.getId())
+                .name(customer.getName())
+                .email(customer.getEmail())
+                .phone(customer.getPhone())
+                .address(customer.getAddress())
+                .build();
+    }
+
     @Override
     public List<CustomerResponse> searchCustomers(String query) {
-        return customerRepository.searchCustomers(query).stream()
-                .map(customer -> modelMapper.map(customer, CustomerResponse.class))
+        List<Customer> customers;
+        if (query == null || query.trim().isEmpty()) {
+            customers = customerRepository.findAll();
+        } else {
+            customers = customerRepository.searchCustomers(query);
+        }
+
+        return customers.stream()
+                .map(this::mapToCustomerResponse)
                 .collect(Collectors.toList());
     }
 

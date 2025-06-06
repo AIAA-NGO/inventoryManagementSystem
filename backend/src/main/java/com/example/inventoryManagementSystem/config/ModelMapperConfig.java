@@ -1,4 +1,3 @@
-//to be reviewed
 package com.example.inventoryManagementSystem.config;
 
 import com.example.inventoryManagementSystem.dto.request.ProductRequest;
@@ -29,7 +28,6 @@ public class ModelMapperConfig {
             @Override
             protected void configure() {
                 skip().setId(null);
-                skip().setSupplier(null);
                 skip().setCategory(null);
                 skip().setBrand(null);
                 skip().setUnit(null);
@@ -42,8 +40,6 @@ public class ModelMapperConfig {
         modelMapper.addMappings(new PropertyMap<Product, ProductResponse>() {
             @Override
             protected void configure() {
-                map().setSupplierId(source.getSupplier() != null ? source.getSupplier().getId() : null);
-                map().setSupplierName(source.getSupplier() != null ? source.getSupplier().getName() : null);
                 map().setCategoryId(source.getCategory() != null ? source.getCategory().getId() : null);
                 map().setCategoryName(source.getCategory() != null ? source.getCategory().getName() : null);
                 map().setBrandId(source.getBrand() != null ? source.getBrand().getId() : null);

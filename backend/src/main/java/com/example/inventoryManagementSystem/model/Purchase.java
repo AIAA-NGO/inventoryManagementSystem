@@ -2,36 +2,56 @@ package com.example.inventoryManagementSystem.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.CreationTimestamp;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Data
 @Table(name = "purchases")
+@Data
 public class Purchase {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
-    @JoinColumn(name = "supplier_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "supplier_id", nullable = false)
     private Supplier supplier;
 
-    @OneToMany(mappedBy = "purchase", cascade = CascadeType.ALL)
-    private List<PurchaseItem> items;
-
+    @Column(name = "order_date")
     private LocalDateTime orderDate;
-    private LocalDateTime receivedDate;
-    private String status;
-    private Double totalAmount;
 
-    @Column(name = "created_at")
+    @Column(name = "received_date")
+    private LocalDateTime receivedDate;
+
+    @Enumerated(EnumType.STRING)
+    private PurchaseStatus status;
+
+    @Column(name = "total_amount", precision = 19, scale = 2)
+    private BigDecimal totalAmount;
+
+    @Column(name = "tax_amount", precision = 19, scale = 2)
+    private BigDecimal taxAmount;
+
+    @Column(name = "discount_amount", precision = 19, scale = 2)
+    private BigDecimal discountAmount;
+
+    @Column(name = "final_amount", precision = 19, scale = 2)
+    private BigDecimal finalAmount;
+
+    @OneToMany(mappedBy = "purchase", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PurchaseItem> items = new ArrayList<>();
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        orderDate = LocalDateTime.now();
-        status = "PENDING";
+
+    public void addItem(PurchaseItem item) {
+        items.add(item);
+        item.setPurchase(this);
     }
+
 }

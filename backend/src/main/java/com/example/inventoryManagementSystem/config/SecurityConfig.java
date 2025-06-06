@@ -38,9 +38,10 @@ public class SecurityConfig {
                 .cors(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/users").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/users/register").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/users").hasAuthority("ADMIN")
                         .requestMatchers("/api-docs/**", "/swagger-ui/**").permitAll()
-                        .requestMatchers("/api/settings/**").hasRole("ADMIN")
+                        .requestMatchers("/api/settings/**").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/cart").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/cart").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/cart/**").authenticated()
