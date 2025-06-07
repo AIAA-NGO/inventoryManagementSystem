@@ -33,6 +33,14 @@ public class ProductController {
     public ResponseEntity<ProductResponse> createProductWithJson(
             @Valid @RequestBody ProductRequest request) {
         return ResponseEntity.ok(productService.createProduct(request));
+
+    }
+
+    @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ProductResponse> updateProductWithJson(
+            @PathVariable Long id,
+            @Valid @RequestBody ProductRequest request) {
+        return ResponseEntity.ok(productService.updateProduct(id, request));
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
