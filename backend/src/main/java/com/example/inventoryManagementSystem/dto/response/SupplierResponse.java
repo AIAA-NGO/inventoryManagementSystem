@@ -1,6 +1,6 @@
 package com.example.inventoryManagementSystem.dto.response;
 
-import jdk.jshell.Snippet;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,7 +11,7 @@ import java.util.List;
 
 @Data
 @Builder
-@AllArgsConstructor // Add this annotation
+@AllArgsConstructor
 @NoArgsConstructor
 public class SupplierResponse {
     private Long id;

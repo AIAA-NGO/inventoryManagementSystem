@@ -5,6 +5,7 @@ import com.example.inventoryManagementSystem.dto.request.SaleRequest;
 import com.example.inventoryManagementSystem.dto.response.DailySummaryResponse;
 import com.example.inventoryManagementSystem.dto.response.ReceiptResponse;
 import com.example.inventoryManagementSystem.dto.response.SaleResponse;
+import com.example.inventoryManagementSystem.dto.response.SalesTrendResponse;
 import com.example.inventoryManagementSystem.service.SaleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -12,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -89,5 +91,17 @@ public class SaleController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         return ResponseEntity.ok(saleService.getSalesByDateRange(startDate, endDate));
+    }
+
+
+
+    @GetMapping("/trend")
+    public ResponseEntity<List<SalesTrendResponse>> getSalesTrend(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
+            @RequestParam String periodType) {
+        return ResponseEntity.ok(
+                saleService.getSalesTrend(startDate, endDate, periodType)
+        );
     }
 }

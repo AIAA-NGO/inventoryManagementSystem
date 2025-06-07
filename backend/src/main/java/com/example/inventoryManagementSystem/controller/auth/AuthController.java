@@ -104,7 +104,7 @@ public class AuthController {
 
         Set<Role> roles = new HashSet<>();
         if (signUpRequest.getRole() == null || signUpRequest.getRole().isEmpty()) {
-            // Default role: ROLE_cashier
+            // Default role: ROLE_ADMIN
             Role userRole = roleRepository.findByName(Role.ERole.ADMIN)
                     .orElseThrow(() -> new RuntimeException("Error: Role not found."));
             roles.add(userRole);

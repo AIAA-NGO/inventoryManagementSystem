@@ -54,4 +54,10 @@ public class Purchase {
         item.setPurchase(this);
     }
 
+    public enum PurchaseStatus {
+        PENDING,
+        RECEIVED,
+        CANCELLED
+    }
+
 }

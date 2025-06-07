@@ -27,8 +27,6 @@ public class SaleServiceImpl implements SaleService {
     private final ProductRepository productRepository;
     private final CustomerRepository customerRepository;
     private final DiscountRepository discountRepository;
-    private final CartRepository cartRepository;
-    private final CartItemRepository cartItemRepository;
     private final ModelMapper modelMapper;
 
     @Override
@@ -60,8 +58,7 @@ public class SaleServiceImpl implements SaleService {
         saleItems.forEach(item -> item.setSale(savedSale));
         saleItemRepository.saveAll(saleItems);
 
-        return mapToSaleResponse(saleRepository.findByIdWithItems(savedSale.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Sale not found after creation")));
+        return mapToSaleResponse(savedSale);
     }
 
     @Override
@@ -89,7 +86,7 @@ public class SaleServiceImpl implements SaleService {
 
     @Override
     public SaleResponse getSaleById(Long id) {
-        Sale sale = saleRepository.findById(id)
+        Sale sale = saleRepository.findByIdWithItems(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Sale not found"));
         return mapToSaleResponse(sale);
     }
@@ -118,7 +115,7 @@ public class SaleServiceImpl implements SaleService {
 
     @Override
     public SaleResponse refundSale(Long saleId) {
-        Sale sale = saleRepository.findById(saleId)
+        Sale sale = saleRepository.findByIdWithItems(saleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Sale not found with id: " + saleId));
 
         if (sale.getStatus() != Sale.SaleStatus.COMPLETED) {
@@ -138,22 +135,14 @@ public class SaleServiceImpl implements SaleService {
 
     @Override
     public SaleResponse updateSale(Long id, SaleRequest request) {
-        Sale sale = saleRepository.findById(id)
+        Sale sale = saleRepository.findByIdWithItems(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Sale not found with id: " + id));
 
-        if (request.getStatus() != null) {
-            try {
-                Sale.SaleStatus newStatus = Sale.SaleStatus.valueOf(request.getStatus());
-                validateStatusTransition(sale.getStatus(), newStatus);
-                sale.setStatus(newStatus);
-            } catch (IllegalArgumentException e) {
-                throw new BusinessException("Invalid status value: " + request.getStatus());
-            }
-        }
-
-        if (request.getSubtotal() != null || request.getTaxAmount() != null
-                || request.getDiscountAmount() != null || request.getTotal() != null) {
-            throw new BusinessException("Financial fields cannot be updated directly");
+        // Only allow updating customer reference
+        if (request.getCustomerId() != null) {
+            Customer customer = customerRepository.findById(request.getCustomerId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
+            sale.setCustomer(customer);
         }
 
         return mapToSaleResponse(saleRepository.save(sale));
@@ -168,7 +157,7 @@ public class SaleServiceImpl implements SaleService {
 
     @Override
     public SaleResponse cancelSale(Long id) {
-        Sale sale = saleRepository.findById(id)
+        Sale sale = saleRepository.findByIdWithItems(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Sale not found"));
 
         if (sale.getStatus() == Sale.SaleStatus.CANCELLED) {
@@ -216,7 +205,7 @@ public class SaleServiceImpl implements SaleService {
 
     @Override
     public SaleResponse applyDiscount(Long saleId, ApplyDiscountRequest request) {
-        Sale sale = saleRepository.findById(saleId)
+        Sale sale = saleRepository.findByIdWithItems(saleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Sale not found"));
 
         if (sale.getStatus() != Sale.SaleStatus.COMPLETED) {
@@ -234,35 +223,6 @@ public class SaleServiceImpl implements SaleService {
         Sale updatedSale = saleRepository.save(sale);
 
         return mapToSaleResponse(updatedSale);
-    }
-
-    @Override
-    public CartResponse addToCart(AddToCartRequest request) {
-        Cart cart = getOrCreateCart(request.getCartId());
-        Product product = productRepository.findById(request.getProductId())
-                .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
-
-        Optional<CartItem> existingItem = cart.getItems().stream()
-                .filter(item -> item.getProduct().getId().equals(product.getId()))
-                .findFirst();
-
-        if (existingItem.isPresent()) {
-            CartItem item = existingItem.get();
-            item.setQuantity(item.getQuantity() + request.getQuantity());
-            item.setTotalPrice(item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
-        } else {
-            CartItem item = new CartItem();
-            item.setProduct(product);
-            item.setQuantity(request.getQuantity());
-            item.setUnitPrice(BigDecimal.valueOf(product.getPrice()));
-            item.setTotalPrice(BigDecimal.valueOf(product.getPrice()).multiply(BigDecimal.valueOf(request.getQuantity())));
-            item.setCart(cart);
-            cart.getItems().add(item);
-        }
-
-        recalculateCartTotals(cart);
-        Cart savedCart = cartRepository.save(cart);
-        return mapToCartResponse(savedCart);
     }
 
     @Override
@@ -301,7 +261,7 @@ public class SaleServiceImpl implements SaleService {
         }
     }
 
-    private List<SaleItem> processSaleItems(List<CartItemRequest> itemRequests, Sale sale) {
+    private List<SaleItem> processSaleItems(List<SaleItemRequest> itemRequests, Sale sale) {
         return itemRequests.stream().map(itemRequest -> {
             Product product = productRepository.findById(itemRequest.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
@@ -316,9 +276,15 @@ public class SaleServiceImpl implements SaleService {
             SaleItem saleItem = new SaleItem();
             saleItem.setProduct(product);
             saleItem.setQuantity(itemRequest.getQuantity());
-            saleItem.setUnitPrice(BigDecimal.valueOf(product.getPrice()));
-            saleItem.setTotalPrice(saleItem.getUnitPrice()
-                    .multiply(BigDecimal.valueOf(itemRequest.getQuantity())));
+
+            // Convert product price to BigDecimal if it's stored as Double
+            BigDecimal unitPrice = BigDecimal.valueOf(product.getPrice());
+            saleItem.setUnitPrice(unitPrice);
+
+            // Calculate total price using BigDecimal arithmetic
+            BigDecimal quantity = BigDecimal.valueOf(itemRequest.getQuantity());
+            saleItem.setTotalPrice(unitPrice.multiply(quantity));
+
             saleItem.setDiscountAmount(BigDecimal.ZERO);
             saleItem.setSale(sale);
 
@@ -333,7 +299,8 @@ public class SaleServiceImpl implements SaleService {
     }
 
     private BigDecimal calculateTaxAmount(BigDecimal amount) {
-        return amount.multiply(BigDecimal.valueOf(0.16));
+        return amount.multiply(BigDecimal.valueOf(0.16))
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     private SaleResponse mapToSaleResponse(Sale sale) {
@@ -354,56 +321,6 @@ public class SaleServiceImpl implements SaleService {
 
     private SaleItemResponse mapToSaleItemResponse(SaleItem item) {
         return SaleItemResponse.builder()
-                .productId(item.getProduct().getId())
-                .productName(item.getProduct().getName())
-                .quantity(item.getQuantity())
-                .unitPrice(item.getUnitPrice())
-                .totalPrice(item.getTotalPrice())
-                .discountAmount(item.getDiscountAmount())
-                .build();
-    }
-
-    private Cart getOrCreateCart(Long cartId) {
-        if (cartId != null) {
-            return cartRepository.findById(cartId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Cart not found"));
-        }
-        return cartRepository.save(new Cart());
-    }
-
-    private void recalculateCartTotals(Cart cart) {
-        BigDecimal subtotal = cart.getItems().stream()
-                .map(CartItem::getTotalPrice)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal totalDiscount = cart.getItems().stream()
-                .map(CartItem::getDiscountAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal taxableAmount = subtotal.subtract(totalDiscount);
-        BigDecimal taxAmount = calculateTaxAmount(taxableAmount);
-
-        cart.setSubtotal(subtotal);
-        cart.setDiscountAmount(totalDiscount);
-        cart.setTaxAmount(taxAmount);
-        cart.setTotal(subtotal.add(taxAmount).subtract(totalDiscount));
-    }
-
-    private CartResponse mapToCartResponse(Cart cart) {
-        return CartResponse.builder()
-                .cartId(cart.getId())
-                .items(cart.getItems().stream()
-                        .map(this::mapToCartItemResponse)
-                        .collect(Collectors.toList()))
-                .subtotal(cart.getSubtotal())
-                .discountAmount(cart.getDiscountAmount())
-                .taxAmount(cart.getTaxAmount())
-                .total(cart.getTotal())
-                .build();
-    }
-
-    private CartItemResponse mapToCartItemResponse(CartItem item) {
-        return CartItemResponse.builder()
                 .productId(item.getProduct().getId())
                 .productName(item.getProduct().getName())
                 .quantity(item.getQuantity())
@@ -438,5 +355,24 @@ public class SaleServiceImpl implements SaleService {
                 .map(discount -> itemPrice.multiply(BigDecimal.valueOf(discount.getPercentage() / 100)))
                 .max(BigDecimal::compareTo)
                 .orElse(BigDecimal.ZERO);
+    }
+
+    @Override
+    public List<SalesTrendResponse> getSalesTrend(LocalDateTime startDate,
+                                                  LocalDateTime endDate,
+                                                  String periodType) {
+        if (startDate == null || endDate == null || periodType == null) {
+            throw new IllegalArgumentException("Parameters cannot be null");
+        }
+
+        if (!List.of("DAILY", "WEEKLY", "MONTHLY").contains(periodType.toUpperCase())) {
+            throw new IllegalArgumentException("Invalid period type. Must be DAILY, WEEKLY, or MONTHLY");
+        }
+
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("Start date must be before end date");
+        }
+
+        return saleRepository.getSalesTrend(startDate, endDate, periodType.toUpperCase());
     }
 }

@@ -42,7 +42,7 @@ public class PurchaseServiceImpl implements PurchaseService {
 
         Purchase purchase = new Purchase();
         purchase.setSupplier(supplier);
-        purchase.setStatus(PurchaseStatus.PENDING);
+        purchase.setStatus(Purchase.PurchaseStatus.PENDING);
         purchase.setOrderDate(LocalDateTime.now());
 
         request.getItems().forEach(itemRequest -> {
@@ -83,15 +83,15 @@ public class PurchaseServiceImpl implements PurchaseService {
         Purchase purchase = purchaseRepository.findById(purchaseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Purchase not found with id: " + purchaseId));
 
-        if (purchase.getStatus() == PurchaseStatus.RECEIVED) {
+        if (purchase.getStatus() == Purchase.PurchaseStatus.RECEIVED) {
             throw new BusinessException("Purchase already received");
         }
 
-        if (purchase.getStatus() == PurchaseStatus.CANCELLED) {
+        if (purchase.getStatus() == Purchase.PurchaseStatus.CANCELLED) {
             throw new BusinessException("Cannot receive cancelled purchase");
         }
 
-        purchase.setStatus(PurchaseStatus.RECEIVED);
+        purchase.setStatus(Purchase.PurchaseStatus.RECEIVED);
         purchase.setReceivedDate(LocalDateTime.now());
         updateInventoryStock(purchase);
 
@@ -127,7 +127,6 @@ public class PurchaseServiceImpl implements PurchaseService {
 
         return SupplierResponse.builder()
                 .id(supplier.getId())
-                //.name(supplier.getName())
                 .companyName(supplier.getCompanyName())
                 .contactPerson(supplier.getContactPerson())
                 .email(supplier.getEmail())

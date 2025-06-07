@@ -22,7 +22,6 @@ import java.util.List;
 public class ProductController {
     private final ProductService productService;
 
-    // Get all products
     @GetMapping
     public ResponseEntity<Page<ProductResponse>> getAllProducts(
             @RequestParam(defaultValue = "0") int page,
@@ -30,7 +29,12 @@ public class ProductController {
         return ResponseEntity.ok(productService.getAllProducts(page, size));
     }
 
-    // Create product (with optional image)
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ProductResponse> createProductWithJson(
+            @Valid @RequestBody ProductRequest request) {
+        return ResponseEntity.ok(productService.createProduct(request));
+    }
+
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ProductResponse> createProduct(
             @Valid @ModelAttribute ProductRequest request,
@@ -41,27 +45,29 @@ public class ProductController {
         return ResponseEntity.ok(productService.createProduct(request));
     }
 
-    // Get product by ID
     @GetMapping("/{id}")
     public ResponseEntity<ProductResponse> getProductById(@PathVariable Long id) {
         return ResponseEntity.ok(productService.getProductById(id));
     }
 
-    // View product image
-    @GetMapping("/{id}/image")
-    public ResponseEntity<byte[]> viewProductImage(@PathVariable Long id) {
+    @GetMapping(value = "/{id}/image", produces = {MediaType.IMAGE_JPEG_VALUE, MediaType.IMAGE_PNG_VALUE})
+    public ResponseEntity<byte[]> getProductImage(@PathVariable Long id) {
         ProductResponse product = productService.getProductById(id);
         if (product.getImageData() == null) {
             return ResponseEntity.notFound().build();
         }
 
+        MediaType contentType = product.getImageContentType() != null
+                ? MediaType.parseMediaType(product.getImageContentType())
+                : MediaType.IMAGE_JPEG;
+
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(product.getImageContentType()))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"product_" + id + "\"")
+                .contentType(contentType)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename=\"product_" + id + "\"")
                 .body(product.getImageData());
     }
 
-    // Update product (including optional image update)
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ProductResponse> updateProduct(
             @PathVariable Long id,
@@ -73,46 +79,40 @@ public class ProductController {
         return ResponseEntity.ok(productService.updateProduct(id, request));
     }
 
-    // Delete product image only
     @DeleteMapping("/{id}/image")
     public ResponseEntity<ProductResponse> deleteProductImage(@PathVariable Long id) {
         return ResponseEntity.ok(productService.deleteProductImage(id));
     }
-    // Delete entire product
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
         productService.deleteProduct(id);
         return ResponseEntity.noContent().build();
     }
 
-    // Search products
     @GetMapping("/search")
     public ResponseEntity<List<ProductResponse>> searchProducts(
             @RequestParam(required = false) String query) {
         return ResponseEntity.ok(productService.searchProducts(query));
     }
 
-    // Get low stock products
     @GetMapping("/low-stock")
     public ResponseEntity<List<ProductResponse>> getLowStockProducts() {
         return ResponseEntity.ok(productService.getLowStockProducts());
     }
 
-    // Get products by supplier
     @GetMapping("/supplier/{supplierId}")
     public ResponseEntity<List<ProductResponse>> getProductsBySupplier(
             @PathVariable Long supplierId) {
         return ResponseEntity.ok(productService.getProductsBySupplier(supplierId));
     }
 
-    // Import products from file
     @PostMapping("/import")
     public ResponseEntity<Void> importProducts(@RequestParam("file") MultipartFile file) {
         productService.importProducts(file);
         return ResponseEntity.ok().build();
     }
 
-    // Export products to file
     @GetMapping("/export")
     public ResponseEntity<byte[]> exportProducts() {
         byte[] exportedData = productService.exportProducts();
@@ -121,14 +121,12 @@ public class ProductController {
                 .body(exportedData);
     }
 
-    // Get products by category
     @GetMapping("/category/{categoryId}")
     public ResponseEntity<List<ProductResponse>> getProductsByCategory(
             @PathVariable Long categoryId) {
         return ResponseEntity.ok(productService.getProductsByCategory(categoryId));
     }
 
-    // Get expiring products
     @GetMapping("/expiring")
     public ResponseEntity<List<ProductResponse>> getExpiringProducts(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate thresholdDate) {

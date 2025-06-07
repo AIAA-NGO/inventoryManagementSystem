@@ -9,4 +9,6 @@ import java.util.Optional;
 @Repository
 public interface TaxRateRepository extends JpaRepository<TaxRate, Long> {
     Optional<TaxRate> findByIsActive(boolean isActive);
+    Optional<TaxRate> findFirstByIsActive(boolean isActive);
+
 }

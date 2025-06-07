@@ -1,5 +1,6 @@
 package com.example.inventoryManagementSystem.dto.request;
 
+import jakarta.persistence.Transient;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,6 +26,7 @@ public class ProductRequest {
     @DecimalMin(value = "0.0", inclusive = true, message = "Price must be positive or zero")
     private Double price;
 
+    @Transient
     private MultipartFile imageFile;
 
     @DecimalMin(value = "0.0", inclusive = true, message = "Cost price must be positive or zero")

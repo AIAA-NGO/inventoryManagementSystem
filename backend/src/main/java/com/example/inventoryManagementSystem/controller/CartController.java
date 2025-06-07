@@ -74,7 +74,7 @@ public class CartController {
         SaleRequest saleRequest = SaleRequest.builder()
                 .customerId(request.getCustomerId())
                 .items(cart.getItems().stream()
-                        .map(item -> CartItemRequest.builder()
+                        .map(item -> SaleItemRequest.builder()
                                 .productId(item.getProductId())
                                 .quantity(item.getQuantity())
                                 .build())

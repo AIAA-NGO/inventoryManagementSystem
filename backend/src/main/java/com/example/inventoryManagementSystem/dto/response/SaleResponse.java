@@ -25,5 +25,4 @@ public class SaleResponse {
     private String status;
 
 
-    private Long customerId;
 }
