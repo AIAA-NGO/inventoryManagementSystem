@@ -1,19 +1,18 @@
-//assigning roles are not working properly
+package com.example.inventoryManagementSystem.controller;
 
-package com.example.inventoryManagementSystem.controller.user;
-
-import com.example.inventoryManagementSystem.dto.request.ChangePasswordRequest;
-import com.example.inventoryManagementSystem.dto.request.PasswordUpdateRequest;
-import com.example.inventoryManagementSystem.dto.request.UpdateUserRequest;
-import com.example.inventoryManagementSystem.dto.request.UserRegistrationRequest;
+import com.example.inventoryManagementSystem.dto.request.*;
 import com.example.inventoryManagementSystem.dto.response.UserResponse;
 import com.example.inventoryManagementSystem.model.Role;
+import com.example.inventoryManagementSystem.model.Role.ERole;
 import com.example.inventoryManagementSystem.model.User;
 import com.example.inventoryManagementSystem.repository.RoleRepository;
 import com.example.inventoryManagementSystem.repository.UserRepository;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,7 +29,6 @@ public class UserController {
     private final PasswordEncoder passwordEncoder;
     private final RoleRepository roleRepository;
 
-
     public UserController(UserRepository userRepository,
                           PasswordEncoder passwordEncoder,
                           RoleRepository roleRepository) {
@@ -40,7 +38,7 @@ public class UserController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<List<UserResponse>> getAllUsers() {
         List<User> users = userRepository.findAll();
         List<UserResponse> userResponses = users.stream()
@@ -50,7 +48,7 @@ public class UserController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<?> createUser(@Valid @RequestBody UserRegistrationRequest registrationRequest) {
         if (userRepository.existsByUsername(registrationRequest.getUsername())) {
             return ResponseEntity.badRequest().body("Error: Username is already taken!");
@@ -67,16 +65,15 @@ public class UserController {
         user.setFullName(registrationRequest.getFullName());
         user.setActive(true);
 
-        // Assign role from request (default to ROLE_CASHIER if none provided)
         Set<Role> roles = new HashSet<>();
         String roleName = registrationRequest.getRole() != null ?
-                registrationRequest.getRole() :
-                "ROLE_CASHIER";
+                registrationRequest.getRole().toUpperCase() :
+                "CASHIER";
 
         try {
-            Role.ERole roleEnum = Role.ERole.valueOf(roleName);
+            ERole roleEnum = ERole.valueOf(roleName);
             Role userRole = roleRepository.findByName(roleEnum)
-                    .orElseThrow(() -> new RuntimeException("Error: Role not found."));
+                    .orElseThrow(() -> new RuntimeException("Error: Role '" + roleName + "' not found."));
             roles.add(userRole);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body("Error: Invalid role specified");
@@ -88,7 +85,7 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or #id == principal.id")
+    @PreAuthorize("hasAuthority('ADMIN') or #id == principal.id")
     public ResponseEntity<UserResponse> getUserById(@PathVariable Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -96,30 +93,72 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or #id == principal.id")
-    public ResponseEntity<UserResponse> updateUser(
+    @PreAuthorize("hasAuthority('ADMIN') or #id == principal.id")
+    public ResponseEntity<?> updateUser(
             @PathVariable Long id,
             @Valid @RequestBody UpdateUserRequest updateRequest) {
+
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        user.setFullName(updateRequest.getFullName());
-        user.setEmail(updateRequest.getEmail());
+        if (updateRequest.getFullName() != null) {
+            user.setFullName(updateRequest.getFullName());
+        }
+        if (updateRequest.getEmail() != null) {
+            user.setEmail(updateRequest.getEmail());
+        }
         user.setActive(updateRequest.isActive());
+
+        if (updateRequest.getUsername() != null &&
+                !updateRequest.getUsername().isEmpty() &&
+                !updateRequest.getUsername().equals(user.getUsername())) {
+
+            if (userRepository.existsByUsername(updateRequest.getUsername())) {
+                return ResponseEntity.badRequest().body("Error: Username is already taken!");
+            }
+            user.setUsername(updateRequest.getUsername());
+        }
+
+        if (updateRequest.getPassword() != null && !updateRequest.getPassword().isEmpty()) {
+            user.setPassword(passwordEncoder.encode(updateRequest.getPassword()));
+        }
+
+        // Update role if provided (only ADMIN can do this)
+        if (updateRequest.getRole() != null && !updateRequest.getRole().isEmpty()) {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            boolean isAdmin = auth.getAuthorities().stream()
+                    .anyMatch(grantedAuthority -> grantedAuthority.getAuthority().equals("ADMIN"));
+
+            if (!isAdmin) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body("Error: Only ADMIN can change roles");
+            }
+
+            Set<Role> roles = new HashSet<>();
+            try {
+                ERole roleEnum = ERole.valueOf(updateRequest.getRole().toUpperCase());
+                Role userRole = roleRepository.findByName(roleEnum)
+                        .orElseThrow(() -> new RuntimeException("Error: Role not found."));
+                roles.add(userRole);
+                user.setRoles(roles);
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest().body("Error: Invalid role specified");
+            }
+        }
 
         User updatedUser = userRepository.save(user);
         return ResponseEntity.ok(convertToResponse(updatedUser));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<?> deleteUser(@PathVariable Long id) {
         userRepository.deleteById(id);
         return ResponseEntity.ok().build();
     }
 
     @PutMapping("/{id}/password")
-    @PreAuthorize("hasRole('ADMIN') or #id == principal.id")
+    @PreAuthorize("hasAuthority('ADMIN') or #id == principal.id")
     public ResponseEntity<?> changePassword(
             @PathVariable Long id,
             @Valid @RequestBody ChangePasswordRequest changeRequest) {
@@ -136,7 +175,7 @@ public class UserController {
     }
 
     @PatchMapping("/{id}/reset-password")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<?> resetPassword(
             @PathVariable Long id,
             @Valid @RequestBody PasswordUpdateRequest request) {
@@ -148,11 +187,11 @@ public class UserController {
     }
 
     @GetMapping("/roles")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<List<String>> getAllRoles() {
         List<Role> roles = roleRepository.findAll();
         return ResponseEntity.ok(roles.stream()
-                .map(role -> role.getName().name().replace("ROLE_", ""))
+                .map(role -> role.getName().name())
                 .collect(Collectors.toList()));
     }
 

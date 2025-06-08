@@ -46,7 +46,7 @@ public class CustomerController {
 
     @GetMapping("/search")
     public ResponseEntity<List<CustomerResponse>> searchCustomers(
-            @RequestParam String query) {
+            @RequestParam(required = false) String query) {
         return ResponseEntity.ok(customerService.searchCustomers(query));
     }
 

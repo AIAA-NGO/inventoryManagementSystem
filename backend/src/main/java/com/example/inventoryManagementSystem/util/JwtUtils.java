@@ -1,6 +1,6 @@
 package com.example.inventoryManagementSystem.util;
 
-import com.example.inventoryManagementSystem.service.user.UserDetailsImpl;
+import com.example.inventoryManagementSystem.service.impl.UserDetailsImpl;
 import io.jsonwebtoken.*;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;

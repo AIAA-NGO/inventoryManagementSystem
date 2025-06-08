@@ -11,12 +11,15 @@ public class TaxRate {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 100)
     private String name;
 
     @Column(nullable = false)
     private Double rate;
 
+    @Column(length = 500)
     private String description;
+
+    @Column(nullable = false)
     private boolean isActive = true;
 }

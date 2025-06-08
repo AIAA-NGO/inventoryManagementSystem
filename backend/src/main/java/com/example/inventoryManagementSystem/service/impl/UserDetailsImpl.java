@@ -1,5 +1,4 @@
-package com.example.inventoryManagementSystem.service.user;
-
+package com.example.inventoryManagementSystem.service.impl;
 
 import com.example.inventoryManagementSystem.model.User;
 import lombok.Getter;
@@ -30,12 +29,12 @@ public class UserDetailsImpl implements UserDetails {
         this.authorities = authorities;
     }
 
-    public static UserDetailsImpl build(User user) {
+    public static com.example.inventoryManagementSystem.service.impl.UserDetailsImpl build(User user) {
         List<GrantedAuthority> authorities = user.getRoles().stream()
                 .map(role -> new SimpleGrantedAuthority(role.getName().name()))
                 .collect(Collectors.toList());
 
-        return new UserDetailsImpl(
+        return new com.example.inventoryManagementSystem.service.impl.UserDetailsImpl(
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),
@@ -77,5 +76,4 @@ public class UserDetailsImpl implements UserDetails {
     public boolean isEnabled() {
         return true;
     }
-
 }

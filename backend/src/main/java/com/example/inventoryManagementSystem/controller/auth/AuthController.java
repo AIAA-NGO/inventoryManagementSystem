@@ -8,8 +8,8 @@ import com.example.inventoryManagementSystem.model.Role;
 import com.example.inventoryManagementSystem.model.User;
 import com.example.inventoryManagementSystem.repository.RoleRepository;
 import com.example.inventoryManagementSystem.repository.UserRepository;
+import com.example.inventoryManagementSystem.service.impl.UserDetailsImpl;
 import com.example.inventoryManagementSystem.service.impl.UserDetailsServiceImpl;
-import com.example.inventoryManagementSystem.service.user.UserDetailsImpl;
 import com.example.inventoryManagementSystem.util.JwtUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -104,8 +104,8 @@ public class AuthController {
 
         Set<Role> roles = new HashSet<>();
         if (signUpRequest.getRole() == null || signUpRequest.getRole().isEmpty()) {
-            // Default role: ROLE_cashier
-            Role userRole = roleRepository.findByName(Role.ERole.ROLE_ADMIN)
+            // Default role: ROLE_ADMIN
+            Role userRole = roleRepository.findByName(Role.ERole.ADMIN)
                     .orElseThrow(() -> new RuntimeException("Error: Role not found."));
             roles.add(userRole);
         } else {

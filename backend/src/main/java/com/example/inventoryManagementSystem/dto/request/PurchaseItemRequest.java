@@ -5,16 +5,20 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Data;
 
+import java.math.BigDecimal;
+
 @Data
-public  class PurchaseItemRequest {
-    @NotNull
+public class PurchaseItemRequest {
+    @NotNull(message = "Product ID is required")
     private Long productId;
 
-    @NotNull
-    @Positive
+    @NotNull(message = "Quantity is required")
+    @Positive(message = "Quantity must be greater than zero")
     private Integer quantity;
 
-    @NotNull
-    @PositiveOrZero
-    private Double unitPrice;
+    @NotNull(message = "Unit price is required")
+    @PositiveOrZero(message = "Unit price must be positive or zero")
+    private BigDecimal unitPrice;
+
+    private BigDecimal totalPrice;
 }

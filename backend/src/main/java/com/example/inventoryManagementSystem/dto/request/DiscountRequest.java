@@ -1,10 +1,16 @@
 package com.example.inventoryManagementSystem.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class DiscountRequest {
-    @NotBlank
-    private String discountCode;
+    private String code;
+    private double percentage;
+    private LocalDateTime validFrom;
+    private LocalDateTime validTo;
+    private String description;
+    private List<Long> productIds;
 }

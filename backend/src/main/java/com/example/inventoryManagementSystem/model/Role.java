@@ -16,8 +16,8 @@ public class Role {
     private ERole name;
 
     public enum ERole {
-        ROLE_ADMIN,
-        ROLE_CASHIER,
-        ROLE_MANAGER
+        ADMIN,
+        CASHIER,
+        MANAGER
     }
 }

@@ -1,19 +1,30 @@
 package com.example.inventoryManagementSystem.dto.response;
 
+import lombok.Builder;
 import lombok.Data;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
+@Builder
 public class PurchaseResponse {
+
     private Long id;
-    private Long supplierId;
-    private String supplierName;
+    private SupplierResponse supplier;
+    private String productCategory;
     private LocalDateTime orderDate;
     private LocalDateTime receivedDate;
     private String status;
-    private Double totalAmount;
     private List<PurchaseItemResponse> items;
-    private LocalDateTime createdAt;
-}
 
+    private BigDecimal totalAmount;
+
+    private BigDecimal taxAmount;
+
+    private BigDecimal discountAmount;
+    private BigDecimal finalAmount;
+
+
+}
