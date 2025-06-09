@@ -16,8 +16,6 @@ import java.util.Optional;
 @Repository
 public interface SaleRepository extends JpaRepository<Sale, Long> {
 
-
-
     @Query("SELECT DISTINCT s FROM Sale s LEFT JOIN FETCH s.items WHERE s.id = :id")
     Optional<Sale> findByIdWithItems(@Param("id") Long id);
 
@@ -27,39 +25,35 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
 
     List<Sale> findByStatus(SaleStatus status);
 
-
     @Query("SELECT COALESCE(SUM(s.total), 0) FROM Sale s WHERE s.status = :status")
     Optional<BigDecimal> sumTotalByStatus(@Param("status") SaleStatus status);
 
     long countByStatus(SaleStatus status);
 
-
-
     List<Sale> findTop5ByStatusOrderBySaleDateDesc(SaleStatus status);
 
-    @Query(value = "SELECT * FROM sale WHERE status = 'COMPLETED' ORDER BY sale_date DESC LIMIT :limit",
+    @Query(value = "SELECT * FROM sales WHERE status = 'COMPLETED' ORDER BY sale_date DESC LIMIT :limit",
             nativeQuery = true)
     List<Sale> findRecentSales(@Param("limit") int limit);
 
-
-
     @Query(value = """
-        SELECT 
-            DATE_FORMAT(s.sale_date, 
-                CASE WHEN :periodType = 'DAILY' THEN '%Y-%m-%d' 
-                     WHEN :periodType = 'WEEKLY' THEN '%Y-%u' 
-                     ELSE '%Y-%m' END) AS period,
-            SUM(s.total) AS amount,
-            DATE(s.sale_date) AS date
-        FROM sale s
-        WHERE s.sale_date BETWEEN :startDate AND :endDate
-        AND s.status = 'COMPLETED'
-        GROUP BY DATE_FORMAT(s.sale_date, 
-                CASE WHEN :periodType = 'DAILY' THEN '%Y-%m-%d' 
-                     WHEN :periodType = 'WEEKLY' THEN '%Y-%u' 
-                     ELSE '%Y-%m' END)
-        ORDER BY DATE(s.sale_date)
-        """, nativeQuery = true)
+    SET SESSION sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''));
+    SELECT 
+        DATE_FORMAT(s.sale_date, 
+            CASE WHEN :periodType = 'DAILY' THEN '%Y-%m-%d' 
+                 WHEN :periodType = 'WEEKLY' THEN '%Y-%u' 
+                 ELSE '%Y-%m' END) AS period,
+        SUM(s.total) AS amount,
+        DATE(s.sale_date) AS date
+    FROM sales s
+    WHERE s.sale_date BETWEEN :startDate AND :endDate
+    AND s.status = 'COMPLETED'
+    GROUP BY DATE_FORMAT(s.sale_date, 
+            CASE WHEN :periodType = 'DAILY' THEN '%Y-%m-%d' 
+                 WHEN :periodType = 'WEEKLY' THEN '%Y-%u' 
+                 ELSE '%Y-%m' END)
+    ORDER BY DATE(s.sale_date)
+    """, nativeQuery = true)
     List<SalesTrendResponse> getSalesTrend(
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate,

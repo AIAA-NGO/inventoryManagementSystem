@@ -110,8 +110,6 @@
 			<version>3.0.2</version>
 		</dependency>
 
-
-<!--		to look at it and replace later-->
 		<dependency>
 			<groupId>javax.validation</groupId>
 			<artifactId>validation-api</artifactId>
@@ -167,9 +165,6 @@
 			<artifactId>opencsv</artifactId>
 			<version>5.7.1</version>
 		</dependency>
-
-
-
 
 		<dependency>
 			<groupId>com.h2database</groupId>

@@ -23,6 +23,4 @@ public class SaleResponse {
     private BigDecimal discountAmount;
     private BigDecimal total;
     private String status;
-
-
 }

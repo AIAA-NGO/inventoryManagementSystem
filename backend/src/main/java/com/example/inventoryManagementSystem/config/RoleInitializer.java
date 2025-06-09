@@ -12,9 +12,7 @@ public class RoleInitializer {
     @Bean
     public CommandLineRunner initializeRoles(RoleRepository roleRepository) {
         return args -> {
-            // Check if standard roles already exist
             if (roleRepository.countStandardRoles() < 3) {
-                // Insert roles if they don't exist
                 roleRepository.insertRoleIfNotExists(ERole.ADMIN.name());
                 roleRepository.insertRoleIfNotExists(ERole.CASHIER.name());
                 roleRepository.insertRoleIfNotExists(ERole.MANAGER.name());

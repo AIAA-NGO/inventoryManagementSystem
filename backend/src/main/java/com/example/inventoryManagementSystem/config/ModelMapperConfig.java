@@ -15,15 +15,11 @@ public class ModelMapperConfig {
     @Bean
     public ModelMapper modelMapper() {
         ModelMapper modelMapper = new ModelMapper();
-
-        // Configuration of general settings
         modelMapper.getConfiguration()
                 .setAmbiguityIgnored(true)
                 .setFieldMatchingEnabled(true)
                 .setMatchingStrategy(MatchingStrategies.STRICT)
                 .setFieldAccessLevel(org.modelmapper.config.Configuration.AccessLevel.PRIVATE);
-
-        // Custom mapping from ProductRequest to Product
         modelMapper.addMappings(new PropertyMap<ProductRequest, Product>() {
             @Override
             protected void configure() {
@@ -35,8 +31,6 @@ public class ModelMapperConfig {
                 skip().setUpdatedAt(null);
             }
         });
-
-        // Custom mapping from Product to ProductResponse
         modelMapper.addMappings(new PropertyMap<Product, ProductResponse>() {
             @Override
             protected void configure() {
@@ -48,7 +42,6 @@ public class ModelMapperConfig {
                 map().setUnitName(source.getUnit() != null ? source.getUnit().getName() : null);
             }
         });
-
         return modelMapper;
     }
 }

@@ -7,10 +7,9 @@ import com.example.inventoryManagementSystem.exception.BusinessException;
 import com.example.inventoryManagementSystem.exception.ResourceNotFoundException;
 import com.example.inventoryManagementSystem.model.Discount;
 import com.example.inventoryManagementSystem.model.Product;
-import com.example.inventoryManagementSystem.model.TaxRate;
 import com.example.inventoryManagementSystem.repository.DiscountRepository;
 import com.example.inventoryManagementSystem.repository.ProductRepository;
-import com.example.inventoryManagementSystem.repository.TaxRateRepository;
+//import com.example.inventoryManagementSystem.repository.TaxRateRepository;
 import com.example.inventoryManagementSystem.service.CartService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -29,7 +28,6 @@ import java.util.stream.Collectors;
 public class CartServiceImpl implements CartService {
     private final ProductRepository productRepository;
     private final DiscountRepository discountRepository;
-    private final TaxRateRepository taxRateRepository;
 
     private final Map<Long, CartItemResponse> cartItems = new ConcurrentHashMap<>();
     private String appliedDiscountCode;

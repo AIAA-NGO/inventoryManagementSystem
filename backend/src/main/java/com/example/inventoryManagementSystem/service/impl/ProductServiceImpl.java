@@ -32,8 +32,6 @@ public class ProductServiceImpl implements ProductService {
     private final SupplierRepository supplierRepository;
     private final ModelMapper modelMapper;
 
-
-    //to be reviewed
     @Override
     @Transactional
     public ProductResponse createProduct(ProductRequest request) {
@@ -333,30 +331,16 @@ public class ProductServiceImpl implements ProductService {
                 .quantityInStock(product.getQuantityInStock())
                 .lowStockThreshold(product.getLowStockThreshold())
                 .expiryDate(product.getExpiryDate())
-
-                // Supplier details
-//                .supplierId(product.getSupplier() != null ? product.getSupplier().getId() : null)
-//                .supplierName(product.getSupplier() != null ? product.getSupplier().getCompanyName() : null)
-//                .supplierContactPerson(product.getSupplier() != null ? product.getSupplier().getContactPerson() : null)
-//                .supplierEmail(product.getSupplier() != null ? product.getSupplier().getEmail() : null)
-//                .supplierPhone(product.getSupplier() != null ? product.getSupplier().getPhone() : null)
-//                .supplierAddress(product.getSupplier() != null ? product.getSupplier().getAddress() : null)
-//                .supplierWebsite(product.getSupplier() != null ? product.getSupplier().getWebsite() : null)
-
-                // Category details
                 .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
                 .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
 
-                // Brand details
                 .brandId(product.getBrand() != null ? product.getBrand().getId() : null)
                 .brandName(product.getBrand() != null ? product.getBrand().getName() : null)
 
-                // Unit details
                 .unitId(product.getUnit() != null ? product.getUnit().getId() : null)
                 .unitName(product.getUnit() != null ? product.getUnit().getName() : null)
                 .unitAbbreviation(product.getUnit() != null ? product.getUnit().getAbbreviation() : null)
 
-                // Timestamps
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())
                 .build();
@@ -369,8 +353,6 @@ public class ProductServiceImpl implements ProductService {
 
         product.setImageData(null);
         Product updatedProduct = productRepository.save(product);
-
-        // Manual mapping from Product to ProductResponse
         return mapProductToResponse(updatedProduct);
     }
 
@@ -388,9 +370,9 @@ public class ProductServiceImpl implements ProductService {
         response.setCreatedAt(product.getCreatedAt());
         response.setUpdatedAt(product.getUpdatedAt());
         response.setExpiryDate(product.getExpiryDate());
-        response.setImageData(product.getImageData()); // Will be null after deletion
+        response.setImageData(product.getImageData());
 
-        // Map relationships (IDs only)
+
         if (product.getSupplier() != null) {
             response.setSupplierId(product.getSupplier().getId());
         }

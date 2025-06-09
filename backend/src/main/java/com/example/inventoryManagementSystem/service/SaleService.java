@@ -8,7 +8,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface SaleService {
-    // Sale Operations
     SaleResponse createSale(SaleRequest request);
     List<SaleResponse> getAllSales(LocalDate startDate, LocalDate endDate);
     SaleResponse getSaleById(Long id);
@@ -17,7 +16,6 @@ public interface SaleService {
     SaleResponse updateSale(Long id, SaleRequest saleRequest);
     void deleteSale(Long id);
 
-    // Reporting & Analytics
     DailySummaryResponse getDailySummary(LocalDate date);
     List<SalesTrendResponse> getSalesTrend(
             LocalDateTime startDate,
@@ -25,11 +23,8 @@ public interface SaleService {
             String periodType
     );
     ReceiptResponse generateReceipt(Long saleId);
-
     List<SaleResponse> getSalesByCustomer(Long customerId);
     List<SaleResponse> getSalesByStatus(String status);
     List<SaleResponse> getSalesByDateRange(LocalDate startDate, LocalDate endDate);
-
-    // Discounts
     SaleResponse applyDiscount(Long saleId, ApplyDiscountRequest request);
 }

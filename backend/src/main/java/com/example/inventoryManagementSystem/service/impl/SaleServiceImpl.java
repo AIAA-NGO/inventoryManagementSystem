@@ -138,7 +138,6 @@ public class SaleServiceImpl implements SaleService {
         Sale sale = saleRepository.findByIdWithItems(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Sale not found with id: " + id));
 
-        // Only allow updating customer reference
         if (request.getCustomerId() != null) {
             Customer customer = customerRepository.findById(request.getCustomerId())
                     .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
@@ -276,12 +275,8 @@ public class SaleServiceImpl implements SaleService {
             SaleItem saleItem = new SaleItem();
             saleItem.setProduct(product);
             saleItem.setQuantity(itemRequest.getQuantity());
-
-            // Convert product price to BigDecimal if it's stored as Double
             BigDecimal unitPrice = BigDecimal.valueOf(product.getPrice());
             saleItem.setUnitPrice(unitPrice);
-
-            // Calculate total price using BigDecimal arithmetic
             BigDecimal quantity = BigDecimal.valueOf(itemRequest.getQuantity());
             saleItem.setTotalPrice(unitPrice.multiply(quantity));
 

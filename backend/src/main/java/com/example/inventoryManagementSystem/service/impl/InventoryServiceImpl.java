@@ -45,12 +45,10 @@ public class InventoryServiceImpl implements InventoryService {
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + request.getProductId()));
 
-        // Handle inventory adjustment
         if (request.getAdjustmentAmount() != null && request.getAdjustmentAmount() != 0) {
             adjustProductStock(product, request.getAdjustmentAmount(), request.getReason());
         }
 
-        // Handle supplier order if requested
         if (Boolean.TRUE.equals(request.getCreateSupplierOrder())) {
             createSupplierOrder(product, request.getOrderQuantity(), request.getReason());
         }
@@ -62,15 +60,12 @@ public class InventoryServiceImpl implements InventoryService {
         List<Product> expiredProducts = productRepository.findByExpiryDateBefore(LocalDate.now());
 
         expiredProducts.forEach(product -> {
-            // Record the removal before adjusting stock
             InventoryAdjustment adjustment = new InventoryAdjustment();
             adjustment.setProduct(product);
             adjustment.setAdjustmentAmount(-product.getQuantityInStock());
             adjustment.setReason("Expired product removal");
             adjustment.setAdjustmentDate(LocalDate.now());
             inventoryAdjustmentRepository.save(adjustment);
-
-            // Set stock to zero
             product.setQuantityInStock(0);
             productRepository.save(product);
         });
@@ -95,8 +90,6 @@ public class InventoryServiceImpl implements InventoryService {
         }
         product.setQuantityInStock(newQuantity);
         productRepository.save(product);
-
-        // Record adjustment
         InventoryAdjustment adjustment = new InventoryAdjustment();
         adjustment.setProduct(product);
         adjustment.setAdjustmentAmount(adjustmentAmount);
@@ -114,21 +107,17 @@ public class InventoryServiceImpl implements InventoryService {
             throw new IllegalArgumentException("Order quantity must be positive");
         }
 
-        // Create a new purchase order
         Purchase purchase = new Purchase();
         purchase.setSupplier(product.getSupplier());
         purchase.setOrderDate(LocalDateTime.now());
         purchase.setStatus(Purchase.PurchaseStatus.PENDING);
 
-        // Set the reason/notes
         String noteOrReason = reason != null ? reason : "Low stock replenishment";
         try {
-            // First try to set notes
             purchase.getClass().getMethod("setNotes", String.class)
                     .invoke(purchase, noteOrReason);
         } catch (NoSuchMethodException e1) {
             try {
-                // If setNotes doesn't exist, try setReason
                 purchase.getClass().getMethod("setReason", String.class)
                         .invoke(purchase, noteOrReason);
             } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e2) {
@@ -139,16 +128,12 @@ public class InventoryServiceImpl implements InventoryService {
         }
 
         purchase = purchaseRepository.save(purchase);
-
-        // Add the product to the purchase order
         PurchaseItem purchaseItem = new PurchaseItem();
         purchaseItem.setProduct(product);
         purchaseItem.setQuantity(orderQuantity);
         purchaseItem.setUnitPrice(BigDecimal.valueOf(product.getCostPrice()));
         purchaseItem.setPurchase(purchase);
         purchaseItemRepository.save(purchaseItem);
-
-        // Update purchase totals
         purchase.setTotalAmount(BigDecimal.valueOf(product.getCostPrice() * orderQuantity));
         purchaseRepository.save(purchase);
     }
@@ -181,7 +166,6 @@ public class InventoryServiceImpl implements InventoryService {
         response.setStockStatus(stockStatus);
         response.setExpiryDate(product.getExpiryDate());
         response.setIsExpired(isExpired);
-
         return response;
     }
 
@@ -204,9 +188,6 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     private int calculateSuggestedOrderQuantity(Product product) {
-        //this logic should be reviewd
-        // Calculate suggested quantity as 2x the difference between threshold and current stock
-        // with a minimum of 10 units or the threshold amount, whichever is higher
         int suggested = product.getLowStockThreshold() * 2 - product.getQuantityInStock();
         return Math.max(Math.max(suggested, product.getLowStockThreshold()), 10);
     }

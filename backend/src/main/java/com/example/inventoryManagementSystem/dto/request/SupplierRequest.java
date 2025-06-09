@@ -18,7 +18,7 @@ public class SupplierRequest {
     @Size(max = 100, message = "Email must be less than 100 characters")
     private String email;
 
-    @Pattern(regexp = "^\\+?[0-9\\s-]{6,20}$", message = "Phone number must be between 6-20 digits and may include +, - or spaces")
+    @Pattern(regexp = "^\\+?[0-9\\s-]{10,13}$", message = "Phone number must be between 6-20 digits and may include +, - or spaces")
     private String phone;
 
     @Size(max = 500, message = "Address must be less than 500 characters")

@@ -30,11 +30,9 @@ public class DashboardServiceImpl implements DashboardService {
 
     @Override
     public DashboardSummaryResponse getBusinessSummary() {
-        // Total revenue from completed sales
         BigDecimal totalRevenue = saleRepository.sumTotalByStatus(Sale.SaleStatus.COMPLETED)
                 .orElse(BigDecimal.ZERO);
 
-        // Calculate profit (revenue - cost)
         BigDecimal totalProfit = saleItemRepository.findAll().stream()
                 .filter(item -> item.getSale().getStatus() == Sale.SaleStatus.COMPLETED)
                 .map(item -> {
@@ -44,7 +42,6 @@ public class DashboardServiceImpl implements DashboardService {
                 })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Count metrics
         long totalSales = saleRepository.countByStatus(Sale.SaleStatus.COMPLETED);
         long totalProducts = productRepository.count();
         long lowStockItems = productRepository.countByQuantityInStockLessThanEqual(DEFAULT_LOW_STOCK_THRESHOLD);

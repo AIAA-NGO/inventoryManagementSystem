@@ -26,7 +26,6 @@ public class SupplierServiceImpl implements SupplierService {
     @Transactional
     public SupplierResponse createSupplier(SupplierRequest request) {
         Supplier supplier = new Supplier();
-        //supplier.setName(request.getName());
         supplier.setCompanyName(request.getCompanyName());
         supplier.setContactPerson(request.getContactPerson());
         supplier.setEmail(request.getEmail());
@@ -34,7 +33,6 @@ public class SupplierServiceImpl implements SupplierService {
         supplier.setAddress(request.getAddress());
         supplier.setWebsite(request.getWebsite());
 
-        // Add categories directly to the supplier
         if (request.getCategoryIds() != null && !request.getCategoryIds().isEmpty()) {
             List<Category> categories = categoryRepository.findAllById(request.getCategoryIds());
             if (categories.size() != request.getCategoryIds().size()) {
@@ -140,7 +138,6 @@ public class SupplierServiceImpl implements SupplierService {
     @Transactional(readOnly = true)
     public List<SupplierResponse> searchSuppliers(String companyName, String contactPerson, String category) {
         if (category != null && !category.isEmpty()) {
-            // Search by category name
             return supplierRepository.findBySuppliedCategoriesNameContainingIgnoreCase(category).stream()
                     .filter(supplier -> matchesSearchCriteria(supplier, companyName, contactPerson))
                     .map(this::mapToSupplierResponse)

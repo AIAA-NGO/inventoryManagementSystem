@@ -33,7 +33,7 @@ public class ReportServiceImpl implements ReportService {
     private final PurchaseRepository purchaseRepository;
     private final PurchaseItemRepository purchaseItemRepository;
     private final SupplierRepository supplierRepository;
-    private final TaxRateRepository taxRateRepository;
+
 
     @Override
     public List<SalesReportResponse> generateSalesReport(LocalDate startDate, LocalDate endDate) {
@@ -165,7 +165,6 @@ public class ReportServiceImpl implements ReportService {
         response.setPeriodStart(startDate != null ? startDate : LocalDate.MIN);
         response.setPeriodEnd(endDate != null ? endDate : LocalDate.now());
 
-        // Calculate revenue from completed sales
         List<Sale> sales = saleRepository.findBySaleDateBetween(
                         startDateTime != null ? startDateTime : LocalDateTime.MIN,
                         endDateTime != null ? endDateTime : LocalDateTime.now()
@@ -178,7 +177,6 @@ public class ReportServiceImpl implements ReportService {
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
 
-        // Calculate cost of goods sold
         List<SaleItem> saleItems = sales.stream()
                 .flatMap(sale -> saleItemRepository.findBySale_Id(sale.getId()).stream())
                 .collect(Collectors.toList());
@@ -188,14 +186,8 @@ public class ReportServiceImpl implements ReportService {
                         .multiply(BigDecimal.valueOf(item.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         response.setTotalCost(totalCost);
-
-        // Calculate gross profit
         response.setGrossProfit(response.getTotalRevenue().subtract(totalCost));
-
-        // Calculate expenses (placeholder - should include salaries, rent)
         response.setExpenses(BigDecimal.valueOf(0));
-
-        // Calculate net profit
         response.setNetProfit(response.getGrossProfit().subtract(response.getExpenses()));
 
         return response;
@@ -209,16 +201,6 @@ public class ReportServiceImpl implements ReportService {
         TaxReportResponse response = new TaxReportResponse();
         response.setPeriodStart(startDate != null ? startDate : LocalDate.MIN);
         response.setPeriodEnd(endDate != null ? endDate : LocalDate.now());
-
-        // Get default tax rate
-        Optional<TaxRate> activeTaxRate = taxRateRepository.findFirstByIsActive(true);
-        if (!activeTaxRate.isPresent()) {
-            throw new RuntimeException("No active tax rate found");
-        }
-        TaxRate taxRate = activeTaxRate.get();
-        response.setTaxRate(taxRate.getName() + " (" + taxRate.getRate() + "%)");
-
-        // Calculate taxable sales and tax collected
         List<Sale> sales = saleRepository.findBySaleDateBetween(
                         startDateTime != null ? startDateTime : LocalDateTime.MIN,
                         endDateTime != null ? endDateTime : LocalDateTime.now()
@@ -311,8 +293,6 @@ public class ReportServiceImpl implements ReportService {
     private byte[] generateExcelReport(ExportReportRequest request) {
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Report");
-
-            // Create header row
             Row headerRow = sheet.createRow(0);
             CellStyle headerStyle = workbook.createCellStyle();
             Font headerFont = workbook.createFont();
@@ -335,8 +315,6 @@ public class ReportServiceImpl implements ReportService {
                 default:
                     throw new IllegalArgumentException("Unsupported report type for Excel export");
             }
-
-            // Auto-size columns
             for (int i = 0; i < headerRow.getLastCellNum(); i++) {
                 sheet.autoSizeColumn(i);
             }

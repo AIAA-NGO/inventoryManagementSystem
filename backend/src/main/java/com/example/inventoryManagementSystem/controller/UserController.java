@@ -123,7 +123,6 @@ public class UserController {
             user.setPassword(passwordEncoder.encode(updateRequest.getPassword()));
         }
 
-        // Update role if provided (only ADMIN can do this)
         if (updateRequest.getRole() != null && !updateRequest.getRole().isEmpty()) {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             boolean isAdmin = auth.getAuthorities().stream()

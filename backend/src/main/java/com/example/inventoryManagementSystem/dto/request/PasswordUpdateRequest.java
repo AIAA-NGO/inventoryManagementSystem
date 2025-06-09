@@ -1,7 +1,9 @@
 package com.example.inventoryManagementSystem.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
 
+@Getter
 public class PasswordUpdateRequest {
     @NotBlank
     private String oldPassword;
@@ -19,18 +21,10 @@ public class PasswordUpdateRequest {
     }
 
 
-    public String getOldPassword() {
-        return oldPassword;
-    }
-
     public void setOldPassword(String oldPassword) {
         this.oldPassword = oldPassword;
     }
 
-
-    public String getNewPassword() {
-        return newPassword;
-    }
 
     public void setNewPassword(String newPassword) {
         this.newPassword = newPassword;

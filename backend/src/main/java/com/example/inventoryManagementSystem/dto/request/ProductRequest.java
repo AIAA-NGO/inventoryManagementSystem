@@ -52,5 +52,5 @@ public class ProductRequest {
     @Future(message = "Expiry date must be in the future")
     private LocalDate expiryDate;
 
-    
+
 }
