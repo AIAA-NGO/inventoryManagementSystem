@@ -9,7 +9,6 @@ import com.example.inventoryManagementSystem.model.Discount;
 import com.example.inventoryManagementSystem.model.Product;
 import com.example.inventoryManagementSystem.repository.DiscountRepository;
 import com.example.inventoryManagementSystem.repository.ProductRepository;
-//import com.example.inventoryManagementSystem.repository.TaxRateRepository;
 import com.example.inventoryManagementSystem.service.CartService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -59,6 +58,8 @@ public class CartServiceImpl implements CartService {
 
     @Override
     public CartResponse addItemsToCart(List<CartItemRequest> requests) {
+        validateQuantitiesAgainstStock(requests);
+
         Map<Long, Integer> quantityMap = requests.stream()
                 .collect(Collectors.toMap(
                         CartItemRequest::getProductId,
@@ -77,9 +78,10 @@ public class CartServiceImpl implements CartService {
             CartItemResponse existingItem = cartItems.get(productId);
 
             if (existingItem != null) {
-                existingItem.setQuantity(existingItem.getQuantity() + quantity);
+                int newQuantity = existingItem.getQuantity() + quantity;
+                existingItem.setQuantity(newQuantity);
                 existingItem.setTotalPrice(existingItem.getUnitPrice()
-                        .multiply(BigDecimal.valueOf(existingItem.getQuantity())));
+                        .multiply(BigDecimal.valueOf(newQuantity)));
                 existingItem.setDiscountAmount(
                         existingItem.getDiscountAmount().add(itemDiscount)
                 );
@@ -100,6 +102,32 @@ public class CartServiceImpl implements CartService {
         return getCart();
     }
 
+    private void validateQuantitiesAgainstStock(List<CartItemRequest> requests) {
+        Map<Long, Integer> requestedQuantities = requests.stream()
+                .collect(Collectors.groupingBy(
+                        CartItemRequest::getProductId,
+                        Collectors.summingInt(CartItemRequest::getQuantity)
+                ));
+
+        for (Map.Entry<Long, Integer> entry : requestedQuantities.entrySet()) {
+            Long productId = entry.getKey();
+            int requestedQuantity = entry.getValue();
+
+            Product product = productRepository.findById(productId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
+
+            int currentQuantityInCart = cartItems.containsKey(productId) ? cartItems.get(productId).getQuantity() : 0;
+            int totalQuantityAfterAddition = currentQuantityInCart + requestedQuantity;
+
+            if (totalQuantityAfterAddition > product.getQuantityInStock()) {
+                throw new BusinessException(String.format(
+                        "Cannot add %d items of product '%s' to cart. Only %d items available in stock. You already have %d in your cart.",
+                        requestedQuantity, product.getName(), product.getQuantityInStock(), currentQuantityInCart
+                ));
+            }
+        }
+    }
+
     private BigDecimal calculateMaxDiscount(BigDecimal itemPrice, List<Discount> discounts) {
         return discounts.stream()
                 .map(d -> itemPrice.multiply(BigDecimal.valueOf(d.getPercentage() / 100)))
@@ -117,7 +145,10 @@ public class CartServiceImpl implements CartService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
 
         if (product.getQuantityInStock() < newQuantity) {
-            throw new BusinessException("Not enough stock available");
+            throw new BusinessException(String.format(
+                    "Not enough stock available for product '%s'. Only %d items available.",
+                    product.getName(), product.getQuantityInStock()
+            ));
         }
 
         List<Discount> discounts = discountRepository.findActiveDiscountsForProduct(product);
