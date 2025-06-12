@@ -1,4 +1,4 @@
-package com.example.inventoryManagementSystem.dto.request;
+package com.example.inventoryManagementSystem.exception;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;

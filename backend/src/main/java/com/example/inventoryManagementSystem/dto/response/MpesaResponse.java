@@ -1,4 +1,4 @@
-package com.example.inventoryManagementSystem.dto.request;
+package com.example.inventoryManagementSystem.dto.response;
 
 import lombok.Data;
 import lombok.NonNull;

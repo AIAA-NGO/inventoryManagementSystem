@@ -1,9 +1,8 @@
 package com.example.inventoryManagementSystem.controller;
 
-import com.example.inventoryManagementSystem.dto.request.InventoryAdjustmentRequest;
-import com.example.inventoryManagementSystem.dto.request.MpesaAuthorization;
-import com.example.inventoryManagementSystem.dto.request.MpesaResponse;
+import com.example.inventoryManagementSystem.exception.MpesaAuthorization;
 import com.example.inventoryManagementSystem.dto.request.Mpesarequest;
+import com.example.inventoryManagementSystem.dto.response.MpesaResponse;
 import com.example.inventoryManagementSystem.util.JsonMapper;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,7 +16,7 @@ import java.net.http.HttpResponse;
 
 
 @RestController
-@RequestMapping("/api/mpesa")
+@RequestMapping("/try/mpesa")
 public class MpesaController {
 
     @PostMapping("/response")

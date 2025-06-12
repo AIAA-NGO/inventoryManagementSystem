@@ -1,6 +1,6 @@
 package com.example.inventoryManagementSystem.util;
 
-import com.example.inventoryManagementSystem.dto.request.MpesaAuthorization;
+import com.example.inventoryManagementSystem.exception.MpesaAuthorization;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class JsonMapper {
