@@ -23,7 +23,7 @@ public interface RoleRepository extends JpaRepository<Role, Integer> {
             nativeQuery = true)
     void insertRoleIfNotExists(@Param("roleName") String roleName);
 
-    @Query(value = "SELECT COUNT(*) FROM roles WHERE name IN ('ADMIN', 'CASHIER', 'MANAGER')",
+    @Query(value = "SELECT COUNT(*) FROM roles WHERE name IN ('ADMIN', 'CASHIER', 'MANAGER', 'RECEIVING_CLERK')",
             nativeQuery = true)
     int countStandardRoles();
 }
