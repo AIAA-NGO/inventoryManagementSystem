@@ -20,7 +20,7 @@ public class Permission {
     @Column(nullable = false, unique = true)
     private String name;
 
-    private String description;
+//    private String description;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
