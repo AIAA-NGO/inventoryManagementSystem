@@ -21,6 +21,11 @@ public class PurchaseController {
         return ResponseEntity.ok(purchaseService.getAllPurchases());
     }
 
+    @GetMapping("/pending")
+    public ResponseEntity<List<PurchaseResponse>> getPendingPurchases() {
+        return ResponseEntity.ok(purchaseService.getPendingPurchases());
+    }
+
     @PostMapping
     public ResponseEntity<PurchaseResponse> createPurchase(@Valid @RequestBody PurchaseRequest request) {
         return ResponseEntity.ok(purchaseService.createPurchase(request));
@@ -31,10 +36,21 @@ public class PurchaseController {
         return ResponseEntity.ok(purchaseService.getPurchaseById(id));
     }
 
-
     @PostMapping("/{id}/receive")
     public ResponseEntity<PurchaseResponse> receivePurchase(@PathVariable Long id) {
         return ResponseEntity.ok(purchaseService.receivePurchase(id));
+    }
+
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<PurchaseResponse> cancelPurchase(@PathVariable Long id) {
+        return ResponseEntity.ok(purchaseService.cancelPurchase(id));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<PurchaseResponse> updatePurchase(
+            @PathVariable Long id,
+            @Valid @RequestBody PurchaseRequest request) {
+        return ResponseEntity.ok(purchaseService.updatePurchase(id, request));
     }
 
     @DeleteMapping("/{id}")

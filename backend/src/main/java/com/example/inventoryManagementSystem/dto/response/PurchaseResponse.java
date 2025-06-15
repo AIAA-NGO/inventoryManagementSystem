@@ -21,8 +21,9 @@ public class PurchaseResponse {
 
     private BigDecimal totalAmount;
 
-    private BigDecimal taxAmount;
+//    private BigDecimal taxAmount;
 
     private BigDecimal discountAmount;
     private BigDecimal finalAmount;
+    private LocalDateTime cancellationDate;
 }

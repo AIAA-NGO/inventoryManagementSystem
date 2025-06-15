@@ -35,6 +35,14 @@ public class PurchaseServiceImpl implements PurchaseService {
     }
 
     @Override
+    public List<PurchaseResponse> getPendingPurchases() {
+        return purchaseRepository.findByStatus(Purchase.PurchaseStatus.PENDING)
+                .stream()
+                .map(this::mapToPurchaseResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     @Transactional
     public PurchaseResponse createPurchase(PurchaseRequest request) {
         Supplier supplier = supplierRepository.findById(request.getSupplierId())
@@ -79,9 +87,9 @@ public class PurchaseServiceImpl implements PurchaseService {
 
     @Override
     @Transactional
-    public PurchaseResponse receivePurchase(Long purchaseId) {
-        Purchase purchase = purchaseRepository.findById(purchaseId)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase not found with id: " + purchaseId));
+    public PurchaseResponse receivePurchase(Long id) {
+        Purchase purchase = purchaseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase not found with id: " + id));
 
         if (purchase.getStatus() == Purchase.PurchaseStatus.RECEIVED) {
             throw new BusinessException("Purchase already received");
@@ -105,13 +113,61 @@ public class PurchaseServiceImpl implements PurchaseService {
         return receivePurchase(id);
     }
 
-    private void updateInventoryStock(Purchase purchase) {
-        for (PurchaseItem item : purchase.getItems()) {
-            Product product = item.getProduct();
-            int newQuantity = product.getQuantityInStock() + item.getQuantity();
-            product.setQuantityInStock(newQuantity);
-            productRepository.save(product);
+    @Override
+    @Transactional
+    public PurchaseResponse cancelPurchase(Long id) {
+        Purchase purchase = purchaseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase not found with id: " + id));
+
+        if (purchase.getStatus() != Purchase.PurchaseStatus.PENDING) {
+            throw new BusinessException("Only pending purchases can be cancelled");
         }
+
+        purchase.setStatus(Purchase.PurchaseStatus.CANCELLED);
+        purchase.setCancellationDate(LocalDateTime.now());
+
+        Purchase updatedPurchase = purchaseRepository.save(purchase);
+        return mapToPurchaseResponse(updatedPurchase);
+    }
+
+    @Override
+    @Transactional
+    public PurchaseResponse updatePurchase(Long id, PurchaseRequest request) {
+        Purchase purchase = purchaseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase not found"));
+
+        if (purchase.getStatus() != Purchase.PurchaseStatus.PENDING) {
+            throw new BusinessException("Only pending purchases can be modified");
+        }
+
+        Supplier supplier = supplierRepository.findById(request.getSupplierId())
+                .orElseThrow(() -> new ResourceNotFoundException("Supplier not found"));
+
+        purchase.setSupplier(supplier);
+        purchase.setOrderDate(LocalDateTime.now());
+        purchase.getItems().clear();
+
+        request.getItems().forEach(itemRequest -> {
+            Product product = productRepository.findById(itemRequest.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+
+            PurchaseItem item = new PurchaseItem();
+            item.setProduct(product);
+            item.setQuantity(itemRequest.getQuantity());
+            item.setUnitPrice(itemRequest.getUnitPrice());
+            item.setTotalPrice(itemRequest.getUnitPrice()
+                    .multiply(BigDecimal.valueOf(itemRequest.getQuantity())));
+
+            purchase.addItem(item);
+        });
+
+        BigDecimal total = purchase.getItems().stream()
+                .map(PurchaseItem::getTotalPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        purchase.setTotalAmount(total);
+
+        Purchase updatedPurchase = purchaseRepository.save(purchase);
+        return mapToPurchaseResponse(updatedPurchase);
     }
 
     @Override
@@ -120,6 +176,15 @@ public class PurchaseServiceImpl implements PurchaseService {
         Purchase purchase = purchaseRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Purchase not found"));
         purchaseRepository.delete(purchase);
+    }
+
+    private void updateInventoryStock(Purchase purchase) {
+        for (PurchaseItem item : purchase.getItems()) {
+            Product product = item.getProduct();
+            int newQuantity = product.getQuantityInStock() + item.getQuantity();
+            product.setQuantityInStock(newQuantity);
+            productRepository.save(product);
+        }
     }
 
     private SupplierResponse mapToSupplierResponse(Supplier supplier) {
@@ -165,9 +230,9 @@ public class PurchaseServiceImpl implements PurchaseService {
                 .productCategory(purchaseCategory)
                 .orderDate(purchase.getOrderDate())
                 .receivedDate(purchase.getReceivedDate())
+                .cancellationDate(purchase.getCancellationDate())
                 .status(purchase.getStatus().name())
                 .totalAmount(purchase.getTotalAmount())
-                .taxAmount(purchase.getTaxAmount())
                 .discountAmount(purchase.getDiscountAmount())
                 .finalAmount(purchase.getFinalAmount())
                 .items(mapPurchaseItems(purchase.getItems()))

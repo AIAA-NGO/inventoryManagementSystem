@@ -26,6 +26,9 @@ public class Purchase {
     @Column(name = "received_date")
     private LocalDateTime receivedDate;
 
+    @Column(name = "cancellation_date")  // Added this field
+    private LocalDateTime cancellationDate;
+
     @Enumerated(EnumType.STRING)
     private PurchaseStatus status;
 
@@ -48,10 +51,32 @@ public class Purchase {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-
+    // Business methods
     public void addItem(PurchaseItem item) {
         items.add(item);
         item.setPurchase(this);
+    }
+
+    public void markAsReceived() {
+        this.status = PurchaseStatus.RECEIVED;
+        this.receivedDate = LocalDateTime.now();
+    }
+
+    public void cancel() {
+        this.status = PurchaseStatus.CANCELLED;
+        this.cancellationDate = LocalDateTime.now();
+    }
+
+    public boolean isPending() {
+        return this.status == PurchaseStatus.PENDING;
+    }
+
+    public boolean isReceived() {
+        return this.status == PurchaseStatus.RECEIVED;
+    }
+
+    public boolean isCancelled() {
+        return this.status == PurchaseStatus.CANCELLED;
     }
 
     public enum PurchaseStatus {
@@ -59,5 +84,4 @@ public class Purchase {
         RECEIVED,
         CANCELLED
     }
-
 }

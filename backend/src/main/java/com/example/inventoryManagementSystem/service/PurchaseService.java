@@ -14,4 +14,12 @@ public interface PurchaseService {
     PurchaseResponse getPurchaseById(Long id);
     PurchaseResponse markAsReceived(Long id);
     void deletePurchase(Long id);
+    PurchaseResponse updatePurchase(Long id, PurchaseRequest request);
+
+    List<PurchaseResponse> getPendingPurchases(); // Add this method
+
+
+
+    PurchaseResponse cancelPurchase(Long id); // Add this method
+
 }
