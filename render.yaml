@@ -3,9 +3,35 @@ services:
     name: inventoryManagementSystem
     runtime: docker
     branch: main
-    buildCommand: "./mvnw clean install -DskipTests"
-    startCommand: "java -jar target/inventoryManagementSystem-0.0.1-SNAPSHOT.jar"
     plan: free
+    region: oregon
+    dockerfilePath: Dockerfile
     envVars:
-      - key: JAVA_HOME
-        value: /usr/lib/jvm/java-17-openjdk
+      - key: DATASOURCE_URL
+        value: jdbc:postgresql://ep-green-thunder-a83r5rrg-pooler.eastus2.azure.neon.tech/inventorymanagementsystem?sslmode=require
+      - key: DATASOURCE_USER
+        value: neondb_owner
+      - key: DATASOURCE_PASSWORD
+        value: npg_woOVyPGd3v9m
+      - key: FRONTEND_URL
+        value: https://smesmanagementsystem.netlify.app,http://localhost:3000
+      - key: APP_JWT_SECRET
+        value: AUymw+uyTuIx7XMxZ0Vp+JCci49aX+oo2N5q22aXwfeXT6+5ZrVUFMynCxpnrWgRg9oplMOD786+bSf684Dktg==
+      - key: APP_JWT_EXPIRATION_MS
+        value: "86400000"
+      - key: MPESA_CONSUMER_KEY
+        value: GTaF4csOtMJCfBZ77Z19KH89cZvFJslwzmS9AscbQGLjkfPO
+      - key: MPESA_CONSUMER_SECRET
+        value: GdVJElrXbGaPytczpTYVE96Uss6BEIJoZQAsMBMLc7n2JWsVhgK3munlzSlNXROA
+      - key: MPESA_OAUTH_URL
+        value: https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials
+      - key: MPESA_STKPUSH_URL
+        value: https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest
+      - key: MPESA_BUSINESS_SHORTCODE
+        value: "174379"
+      - key: MPESA_PASSKEY
+        value: bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919
+      - key: MPESA_TRANSACTION_TYPE
+        value: CustomerPayBillOnline
+      - key: MPESA_CALLBACK_URL
+        value: https://dccf-197-248-195-25.ngrok-free.app/mpesa/callback
