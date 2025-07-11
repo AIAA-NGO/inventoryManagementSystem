@@ -1,7 +1,7 @@
 services:
   - type: web
     name: inventoryManagementSystem
-    env: java
+    runtime: docker
     branch: main
     buildCommand: "./mvnw clean install -DskipTests"
     startCommand: "java -jar target/inventoryManagementSystem-0.0.1-SNAPSHOT.jar"
