@@ -56,7 +56,7 @@ public class UserDetailsServiceImpl implements UserDetailsService, userDetailsSe
     @Transactional
     public void updatePassword(Long userId, PasswordUpdateRequest passwordUpdateRequest) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with id: " + userId));
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with User id: " + userId));
         if (!passwordEncoder.matches(passwordUpdateRequest.getOldPassword(), user.getPassword())) {
             throw new RuntimeException("Old password doesn't match");
         }
