@@ -58,6 +58,9 @@ public class ProductServiceImpl implements ProductService {
 
 
     private ProductResponse createProductInternal(ProductRequest request, String imageUrl) {
+        // Removed SKU uniqueness check since SKU is no longer required to be unique
+        // You might want to add other validation logic here if needed
+
         Supplier supplier = supplierRepository.findById(request.getSupplierId())
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier not found with id: " + request.getSupplierId()));
 
@@ -75,8 +78,8 @@ public class ProductServiceImpl implements ProductService {
         Product product = Product.builder()
                 .name(request.getName())
                 .description(request.getDescription())
-                .sku(request.getSku())
-                .barcode(request.getBarcode())
+                .sku(request.getSku()) // Now accepts duplicate SKUs
+                .barcode(request.getBarcode()) // Accepts duplicate barcodes
                 .price(request.getPrice())
                 .costPrice(request.getCostPrice())
                 .quantityInStock(request.getQuantityInStock())
@@ -92,6 +95,7 @@ public class ProductServiceImpl implements ProductService {
         Product savedProduct = productRepository.save(product);
         return mapToProductResponse(savedProduct);
     }
+
 
 
     @Override
@@ -114,11 +118,11 @@ public class ProductServiceImpl implements ProductService {
             Product existingProduct = productRepository.findById(id)
                     .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
 
-            // Update basic fields
+            // Update basic fields - no SKU uniqueness check needed
             existingProduct.setName(request.getName());
             existingProduct.setDescription(request.getDescription());
-            existingProduct.setSku(request.getSku());
-            existingProduct.setBarcode(request.getBarcode());
+            existingProduct.setSku(request.getSku()); // Can now be non-unique
+            existingProduct.setBarcode(request.getBarcode()); // Can now be non-unique
             existingProduct.setPrice(request.getPrice());
             existingProduct.setCostPrice(request.getCostPrice());
             existingProduct.setQuantityInStock(request.getQuantityInStock());

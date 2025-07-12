@@ -28,10 +28,10 @@ public class Product {
     @Column(length = 1000)
     private String description;
 
-    @Column(nullable = false, length = 50, unique = true)
+    @Column(nullable = false, length = 50)
     private String sku;
 
-    @Column(length = 50, unique = true)
+    @Column(length = 50)
     private String barcode;
 
     @Column(nullable = false)
