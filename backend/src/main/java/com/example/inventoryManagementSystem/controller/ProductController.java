@@ -69,12 +69,19 @@ public class ProductController {
         }
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> updateProduct(
             @PathVariable Long id,
-            @Valid @RequestBody ProductRequest request) {
+            @Valid @RequestPart("request") ProductRequest request,
+            @RequestPart(value = "imageFile", required = false) MultipartFile imageFile) {
         try {
-            return ResponseEntity.ok(productService.updateProduct(id, request));
+            ProductResponse response;
+            if (imageFile != null && !imageFile.isEmpty()) {
+                response = productService.updateProductWithImage(id, request, imageFile);
+            } else {
+                response = productService.updateProduct(id, request);
+            }
+            return ResponseEntity.ok(response);
         } catch (ResourceNotFoundException ex) {
             logger.warn("Product not found: id={}", id);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());

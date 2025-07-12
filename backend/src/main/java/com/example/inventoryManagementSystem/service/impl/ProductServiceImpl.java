@@ -139,6 +139,43 @@ public class ProductServiceImpl implements ProductService {
         }
     }
 
+    @Override
+    @Transactional
+    public ProductResponse updateProductWithImage(Long id, ProductRequest request, MultipartFile imageFile) {
+        try {
+            String imageUrl = null;
+            if (imageFile != null && !imageFile.isEmpty()) {
+                imageUrl = fileStorageService.storeFile(imageFile);
+            }
+
+            Product existingProduct = productRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+
+            // Update basic fields
+            existingProduct.setName(request.getName());
+            existingProduct.setDescription(request.getDescription());
+            existingProduct.setSku(request.getSku());
+            existingProduct.setBarcode(request.getBarcode());
+            existingProduct.setPrice(request.getPrice());
+            existingProduct.setCostPrice(request.getCostPrice());
+            existingProduct.setQuantityInStock(request.getQuantityInStock());
+            existingProduct.setLowStockThreshold(request.getLowStockThreshold());
+            existingProduct.setExpiryDate(request.getExpiryDate());
+
+            if (imageUrl != null) {
+                existingProduct.setImageUrl(imageUrl);
+            }
+
+            // Update relationships
+            updateProductRelationships(existingProduct, request);
+
+            Product updatedProduct = productRepository.save(existingProduct);
+            return mapToProductResponse(updatedProduct);
+        } catch (Exception ex) {
+            throw new RuntimeException("Error updating product with image", ex);
+        }
+    }
+
     private void updateProductRelationships(Product product, ProductRequest request) {
         if (!product.getSupplier().getId().equals(request.getSupplierId())) {
             Supplier supplier = supplierRepository.findById(request.getSupplierId())

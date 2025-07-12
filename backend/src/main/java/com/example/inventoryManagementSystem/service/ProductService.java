@@ -23,4 +23,5 @@ public interface ProductService {
     List<ProductResponse> getProductsByCategory(Long categoryId);
     List<ProductResponse> getExpiringProducts(LocalDate thresholdDate);
     ProductResponse deleteProductImage(Long productId);
+    ProductResponse updateProductWithImage(Long id, ProductRequest request, MultipartFile imageFile);
 }
