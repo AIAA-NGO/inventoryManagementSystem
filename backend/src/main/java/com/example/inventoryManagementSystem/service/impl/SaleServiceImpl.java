@@ -47,18 +47,19 @@ public class SaleServiceImpl implements SaleService {
         sale.setItems(saleItems);
 
         BigDecimal subtotal = calculateSubtotal(saleItems);
-        BigDecimal totalDiscount = calculateAutomaticDiscounts(saleItems);
-        BigDecimal taxableAmount = subtotal.subtract(totalDiscount);
+        BigDecimal discountAmount = calculateAutomaticDiscounts(saleItems);
+        BigDecimal taxableAmount = subtotal.subtract(discountAmount);
 
-        BigDecimal taxAmount = taxableAmount.subtract(
-                taxableAmount.divide(BigDecimal.ONE.add(TAX_RATE), 2, RoundingMode.HALF_UP));
-        BigDecimal preTaxAmount = taxableAmount.subtract(taxAmount);
+        // Calculate tax (16% of taxable amount)
+        BigDecimal taxAmount = taxableAmount.multiply(TAX_RATE)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal total = taxableAmount.add(taxAmount);
 
         sale.setSubtotal(subtotal);
+        sale.setDiscountAmount(discountAmount);
         sale.setTaxAmount(taxAmount);
-        sale.setDiscountAmount(totalDiscount);
-        sale.setPreTaxAmount(preTaxAmount);
-        sale.setTotal(subtotal);
+        sale.setTotal(total);
 
         Sale savedSale = saleRepository.save(sale);
         saleItems.forEach(item -> item.setSale(savedSale));
