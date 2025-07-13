@@ -32,13 +32,20 @@ public class ProductController {
 
     @GetMapping
     public ResponseEntity<?> getAllProducts(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
         try {
-            Page<ProductResponse> products = productService.getAllProducts(page, size);
-            return ResponseEntity.ok(products);
+            if (page == null || size == null) {
+                // Return all products if pagination parameters are not provided
+                List<ProductResponse> products = productService.getAllProductsList();
+                return ResponseEntity.ok(products);
+            } else {
+                // Return paginated results if parameters are provided
+                Page<ProductResponse> products = productService.getAllProducts(page, size);
+                return ResponseEntity.ok(products);
+            }
         } catch (Exception e) {
-            logger.error("Error fetching products: page={}, size={}", page, size, e);
+            logger.error("Error fetching products", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error fetching products: " + e.getMessage());
         }
