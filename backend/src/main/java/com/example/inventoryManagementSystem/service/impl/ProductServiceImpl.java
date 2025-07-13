@@ -41,7 +41,6 @@ public class ProductServiceImpl implements ProductService {
         return createProductInternal(request, null);
     }
 
-
     @Override
     @Transactional
     public ProductResponse createProductWithImage(ProductRequest request, MultipartFile imageFile) {
@@ -56,11 +55,7 @@ public class ProductServiceImpl implements ProductService {
         }
     }
 
-
     private ProductResponse createProductInternal(ProductRequest request, String imageUrl) {
-        // Removed SKU uniqueness check since SKU is no longer required to be unique
-        // You might want to add other validation logic here if needed
-
         Supplier supplier = supplierRepository.findById(request.getSupplierId())
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier not found with id: " + request.getSupplierId()));
 
@@ -78,8 +73,8 @@ public class ProductServiceImpl implements ProductService {
         Product product = Product.builder()
                 .name(request.getName())
                 .description(request.getDescription())
-                .sku(request.getSku()) // Now accepts duplicate SKUs
-                .barcode(request.getBarcode()) // Accepts duplicate barcodes
+                .sku(request.getSku())
+                .barcode(request.getBarcode())
                 .price(request.getPrice())
                 .costPrice(request.getCostPrice())
                 .quantityInStock(request.getQuantityInStock())
@@ -95,8 +90,6 @@ public class ProductServiceImpl implements ProductService {
         Product savedProduct = productRepository.save(product);
         return mapToProductResponse(savedProduct);
     }
-
-
 
     @Override
     public Page<ProductResponse> getAllProducts(int page, int size) {
@@ -118,18 +111,16 @@ public class ProductServiceImpl implements ProductService {
             Product existingProduct = productRepository.findById(id)
                     .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
 
-            // Update basic fields - no SKU uniqueness check needed
             existingProduct.setName(request.getName());
             existingProduct.setDescription(request.getDescription());
-            existingProduct.setSku(request.getSku()); // Can now be non-unique
-            existingProduct.setBarcode(request.getBarcode()); // Can now be non-unique
+            existingProduct.setSku(request.getSku());
+            existingProduct.setBarcode(request.getBarcode());
             existingProduct.setPrice(request.getPrice());
             existingProduct.setCostPrice(request.getCostPrice());
             existingProduct.setQuantityInStock(request.getQuantityInStock());
             existingProduct.setLowStockThreshold(request.getLowStockThreshold());
             existingProduct.setExpiryDate(request.getExpiryDate());
 
-            // Update relationships if they've changed
             updateProductRelationships(existingProduct, request);
 
             Product updatedProduct = productRepository.save(existingProduct);
@@ -151,7 +142,6 @@ public class ProductServiceImpl implements ProductService {
             Product existingProduct = productRepository.findById(id)
                     .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
 
-            // Update basic fields
             existingProduct.setName(request.getName());
             existingProduct.setDescription(request.getDescription());
             existingProduct.setSku(request.getSku());
@@ -166,7 +156,6 @@ public class ProductServiceImpl implements ProductService {
                 existingProduct.setImageUrl(imageUrl);
             }
 
-            // Update relationships
             updateProductRelationships(existingProduct, request);
 
             Product updatedProduct = productRepository.save(existingProduct);
@@ -218,16 +207,7 @@ public class ProductServiceImpl implements ProductService {
                 throw new RuntimeException("Cannot delete product as it is referenced in existing sales");
             }
 
-            // Clear relationships to avoid constraint violations
-            product.setSupplier(null);
-            product.setCategory(null);
-            product.setBrand(null);
-            product.setUnit(null);
-
-            // Save the product with null relationships first
-            productRepository.saveAndFlush(product);
-
-            // Then delete
+            // Delete directly without clearing relationships
             productRepository.delete(product);
         } catch (DataIntegrityViolationException ex) {
             throw new RuntimeException("Data integrity violation while deleting product: " + ex.getMostSpecificCause().getMessage(), ex);
@@ -294,7 +274,7 @@ public class ProductServiceImpl implements ProductService {
             Sheet sheet = workbook.getSheetAt(0);
 
             for (Row row : sheet) {
-                if (row.getRowNum() == 0) continue; // Skip header row
+                if (row.getRowNum() == 0) continue;
 
                 ProductRequest request = ProductRequest.builder()
                         .name(getCellStringValue(row.getCell(0)))
@@ -323,7 +303,6 @@ public class ProductServiceImpl implements ProductService {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Products");
 
-            // Create header row
             Row headerRow = sheet.createRow(0);
             String[] headers = {
                     "ID", "Name", "Description", "SKU", "Barcode",
@@ -337,7 +316,6 @@ public class ProductServiceImpl implements ProductService {
                 headerRow.createCell(i).setCellValue(headers[i]);
             }
 
-            // Add data rows
             List<Product> products = productRepository.findAll();
             for (int i = 0; i < products.size(); i++) {
                 Product product = products.get(i);
@@ -354,7 +332,6 @@ public class ProductServiceImpl implements ProductService {
                 row.createCell(cellNum++).setCellValue(product.getQuantityInStock());
                 row.createCell(cellNum++).setCellValue(product.getLowStockThreshold());
 
-                // Supplier info
                 if (product.getSupplier() != null) {
                     row.createCell(cellNum++).setCellValue(product.getSupplier().getId());
                     row.createCell(cellNum++).setCellValue(product.getSupplier().getCompanyName());
@@ -362,7 +339,6 @@ public class ProductServiceImpl implements ProductService {
                     cellNum += 2;
                 }
 
-                // Category info
                 if (product.getCategory() != null) {
                     row.createCell(cellNum++).setCellValue(product.getCategory().getId());
                     row.createCell(cellNum++).setCellValue(product.getCategory().getName());
@@ -370,7 +346,6 @@ public class ProductServiceImpl implements ProductService {
                     cellNum += 2;
                 }
 
-                // Brand info
                 if (product.getBrand() != null) {
                     row.createCell(cellNum++).setCellValue(product.getBrand().getId());
                     row.createCell(cellNum++).setCellValue(product.getBrand().getName());
@@ -378,7 +353,6 @@ public class ProductServiceImpl implements ProductService {
                     cellNum += 2;
                 }
 
-                // Unit info
                 if (product.getUnit() != null) {
                     row.createCell(cellNum++).setCellValue(product.getUnit().getId());
                     row.createCell(cellNum++).setCellValue(product.getUnit().getName());
@@ -386,12 +360,10 @@ public class ProductServiceImpl implements ProductService {
                     cellNum += 2;
                 }
 
-                // Expiry date
                 if (product.getExpiryDate() != null) {
                     row.createCell(cellNum++).setCellValue(product.getExpiryDate().toString());
                 }
 
-                // Image URL
                 row.createCell(cellNum).setCellValue(product.getImageUrl() != null ? product.getImageUrl() : "");
             }
 
