@@ -20,7 +20,5 @@ public class ReceiptResponse {
     private BigDecimal taxAmount;
     private BigDecimal total;
     private BigDecimal preTaxAmount;
-
     private BigDecimal totalProfit;
-
 }

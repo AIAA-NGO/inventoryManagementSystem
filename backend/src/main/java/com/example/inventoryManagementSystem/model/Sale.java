@@ -59,25 +59,23 @@ public class Sale {
                 .map(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        this.preTaxAmount = subtotal.subtract(discountAmount);
+        this.preTaxAmount = subtotal.divide(TAX_RATE.add(BigDecimal.ONE), 2, RoundingMode.HALF_UP);
         this.taxAmount = preTaxAmount.multiply(TAX_RATE)
                 .setScale(2, RoundingMode.HALF_UP);
-        this.total = preTaxAmount.add(taxAmount);
+        this.total = subtotal; // Total equals tax-inclusive subtotal
     }
 
     public BigDecimal calculateProfit() {
         return items.stream()
                 .map(item -> {
+                    BigDecimal revenue = item.getUnitPrice()
+                            .divide(TAX_RATE.add(BigDecimal.ONE), 2, RoundingMode.HALF_UP)
+                            .multiply(BigDecimal.valueOf(item.getQuantity()));
                     BigDecimal cost = BigDecimal.valueOf(item.getProduct().getCostPrice())
                             .multiply(BigDecimal.valueOf(item.getQuantity()));
-                    BigDecimal revenue = item.getTotalPrice().subtract(itemTax(item.getTotalPrice()));
                     return revenue.subtract(cost);
                 })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private BigDecimal itemTax(BigDecimal amount) {
-        return amount.subtract(amount.divide(BigDecimal.ONE.add(TAX_RATE), 2, RoundingMode.HALF_UP));
     }
 
     public BigDecimal getTotalAmount() {

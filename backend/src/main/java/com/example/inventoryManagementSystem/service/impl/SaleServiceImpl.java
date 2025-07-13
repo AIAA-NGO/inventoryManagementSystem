@@ -46,20 +46,24 @@ public class SaleServiceImpl implements SaleService {
         List<SaleItem> saleItems = processSaleItems(request.getItems(), sale);
         sale.setItems(saleItems);
 
+        // Calculate tax-inclusive subtotal (what customer pays)
         BigDecimal subtotal = calculateSubtotal(saleItems);
-        BigDecimal discountAmount = calculateAutomaticDiscounts(saleItems);
-        BigDecimal taxableAmount = subtotal.subtract(discountAmount);
 
-        // Calculate tax (16% of taxable amount)
-        BigDecimal taxAmount = taxableAmount.multiply(TAX_RATE)
+        // Calculate discount
+        BigDecimal discountAmount = calculateAutomaticDiscounts(saleItems);
+
+        // Calculate tax-exclusive amount (for internal calculations)
+        BigDecimal taxExclusiveAmount = subtotal.divide(TAX_RATE.add(BigDecimal.ONE), 2, RoundingMode.HALF_UP);
+
+        // Calculate tax (16% of tax-exclusive amount)
+        BigDecimal taxAmount = taxExclusiveAmount.multiply(TAX_RATE)
                 .setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal total = taxableAmount.add(taxAmount);
-
-        sale.setSubtotal(subtotal);
+        sale.setSubtotal(subtotal); // Tax-inclusive amount (200)
+        sale.setPreTaxAmount(taxExclusiveAmount); // Tax-exclusive amount (172.41)
         sale.setDiscountAmount(discountAmount);
-        sale.setTaxAmount(taxAmount);
-        sale.setTotal(total);
+        sale.setTaxAmount(taxAmount); // 27.59 (not used in totals)
+        sale.setTotal(subtotal); // Same as subtotal (200)
 
         Sale savedSale = saleRepository.save(sale);
         saleItems.forEach(item -> item.setSale(savedSale));
@@ -256,19 +260,24 @@ public class SaleServiceImpl implements SaleService {
 
         List<ReceiptItem> receiptItems = sale.getItems().stream()
                 .map(item -> {
-                    BigDecimal itemTax = item.getTotalPrice().subtract(
-                            item.getTotalPrice().divide(BigDecimal.ONE.add(TAX_RATE), 2, RoundingMode.HALF_UP));
+                    // Calculate tax-exclusive price
+                    BigDecimal taxExclusivePrice = item.getUnitPrice()
+                            .divide(TAX_RATE.add(BigDecimal.ONE), 2, RoundingMode.HALF_UP);
+
+                    BigDecimal itemRevenue = taxExclusivePrice.multiply(BigDecimal.valueOf(item.getQuantity()));
                     BigDecimal itemCost = BigDecimal.valueOf(item.getProduct().getCostPrice())
                             .multiply(BigDecimal.valueOf(item.getQuantity()));
-                    BigDecimal itemProfit = item.getTotalPrice().subtract(itemTax).subtract(itemCost);
+                    BigDecimal itemProfit = itemRevenue.subtract(itemCost);
+                    BigDecimal itemTax = item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity()))
+                            .subtract(itemRevenue);
 
                     return ReceiptItem.builder()
                             .productName(item.getProduct().getName())
                             .quantity(item.getQuantity())
-                            .unitPrice(item.getUnitPrice())
+                            .unitPrice(item.getUnitPrice()) // Shows tax-inclusive price
                             .totalPrice(item.getTotalPrice())
-                            .preTaxAmount(item.getTotalPrice().subtract(itemTax))
-                            .taxAmount(itemTax)
+                            .preTaxAmount(itemRevenue) // Tax-exclusive amount
+                            .taxAmount(itemTax) // Tax amount (for display only)
                             .costAmount(itemCost)
                             .profitAmount(itemProfit)
                             .discountAmount(item.getDiscountAmount())
@@ -277,7 +286,7 @@ public class SaleServiceImpl implements SaleService {
                 .collect(Collectors.toList());
 
         BigDecimal totalProfit = receiptItems.stream()
-                .map(item -> item.getProfitAmount())
+                .map(ReceiptItem::getProfitAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return ReceiptResponse.builder()
@@ -285,11 +294,11 @@ public class SaleServiceImpl implements SaleService {
                 .date(sale.getSaleDate())
                 .customerName(sale.getCustomer().getName())
                 .items(receiptItems)
-                .subtotal(sale.getSubtotal())
+                .subtotal(sale.getSubtotal()) // Tax-inclusive
                 .discountAmount(sale.getDiscountAmount())
-                .preTaxAmount(sale.getPreTaxAmount())
-                .taxAmount(sale.getTaxAmount())
-                .total(sale.getTotal())
+                .preTaxAmount(sale.getPreTaxAmount()) // Tax-exclusive
+                .taxAmount(sale.getTaxAmount()) // For display only
+                .total(sale.getTotal()) // Same as subtotal
                 .totalProfit(totalProfit)
                 .build();
     }
@@ -300,13 +309,11 @@ public class SaleServiceImpl implements SaleService {
             LocalDateTime endDate,
             String periodType) {
 
-        // Normalize and validate period type
         String normalizedPeriodType = periodType.toLowerCase();
         if (!Arrays.asList("day", "week", "month").contains(normalizedPeriodType)) {
             throw new BusinessException("Invalid period type. Must be 'day', 'week', or 'month'");
         }
 
-        // Adjust dates if null
         LocalDateTime effectiveStartDate = startDate != null ? startDate : LocalDateTime.now().minusMonths(6);
         LocalDateTime effectiveEndDate = endDate != null ? endDate : LocalDateTime.now();
 
@@ -317,7 +324,7 @@ public class SaleServiceImpl implements SaleService {
 
         return results.stream()
                 .map(row -> SalesTrendResponse.builder()
-                        .period((String) row[5]) // Using the formatted period label from SQL
+                        .period((String) row[5])
                         .amount((BigDecimal) row[1])
                         .startDate(((Timestamp) row[2]).toLocalDateTime().toLocalDate())
                         .endDate(((Timestamp) row[3]).toLocalDateTime().toLocalDate())
@@ -329,22 +336,14 @@ public class SaleServiceImpl implements SaleService {
     private BigDecimal calculateSaleProfit(Sale sale) {
         return sale.getItems().stream()
                 .map(item -> {
+                    BigDecimal revenue = item.getUnitPrice()
+                            .divide(TAX_RATE.add(BigDecimal.ONE), 2, RoundingMode.HALF_UP)
+                            .multiply(BigDecimal.valueOf(item.getQuantity()));
                     BigDecimal cost = BigDecimal.valueOf(item.getProduct().getCostPrice())
                             .multiply(BigDecimal.valueOf(item.getQuantity()));
-                    BigDecimal revenue = item.getTotalPrice().subtract(
-                            item.getTotalPrice().divide(BigDecimal.ONE.add(TAX_RATE), 2, RoundingMode.HALF_UP));
                     return revenue.subtract(cost);
                 })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private void validateStatusTransition(Sale.SaleStatus current, Sale.SaleStatus newStatus) {
-        if (current == Sale.SaleStatus.CANCELLED || current == Sale.SaleStatus.REFUNDED) {
-            throw new BusinessException("Cannot modify a " + current + " sale");
-        }
-        if (newStatus == Sale.SaleStatus.COMPLETED && current != Sale.SaleStatus.PENDING) {
-            throw new BusinessException("Can only complete pending sales");
-        }
     }
 
     private List<SaleItem> processSaleItems(List<SaleItemRequest> itemRequests, Sale sale) {
@@ -399,11 +398,13 @@ public class SaleServiceImpl implements SaleService {
     }
 
     private SaleItemResponse mapToSaleItemResponse(SaleItem item) {
-        BigDecimal itemTax = item.getTotalPrice().subtract(
-                item.getTotalPrice().divide(BigDecimal.ONE.add(TAX_RATE), 2, RoundingMode.HALF_UP));
-        BigDecimal itemCost = BigDecimal.valueOf(item.getProduct().getCostPrice())
+        BigDecimal revenue = item.getUnitPrice()
+                .divide(TAX_RATE.add(BigDecimal.ONE), 2, RoundingMode.HALF_UP)
                 .multiply(BigDecimal.valueOf(item.getQuantity()));
-        BigDecimal itemProfit = item.getTotalPrice().subtract(itemTax).subtract(itemCost);
+        BigDecimal cost = BigDecimal.valueOf(item.getProduct().getCostPrice())
+                .multiply(BigDecimal.valueOf(item.getQuantity()));
+        BigDecimal profit = revenue.subtract(cost);
+        BigDecimal tax = item.getTotalPrice().subtract(revenue);
 
         return SaleItemResponse.builder()
                 .productId(item.getProduct().getId())
@@ -411,10 +412,10 @@ public class SaleServiceImpl implements SaleService {
                 .quantity(item.getQuantity())
                 .unitPrice(item.getUnitPrice())
                 .totalPrice(item.getTotalPrice())
-                .preTaxAmount(item.getTotalPrice().subtract(itemTax))
-                .taxAmount(itemTax)
-                .costAmount(itemCost)
-                .profitAmount(itemProfit)
+                .preTaxAmount(revenue)
+                .taxAmount(tax)
+                .costAmount(cost)
+                .profitAmount(profit)
                 .discountAmount(item.getDiscountAmount())
                 .build();
     }
