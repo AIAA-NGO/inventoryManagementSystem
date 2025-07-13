@@ -27,6 +27,7 @@ public class CartServiceImpl implements CartService {
     private final ProductRepository productRepository;
     private final DiscountRepository discountRepository;
 
+
     // Store carts in memory with username as key
     private final Map<String, UserCart> userCarts = new ConcurrentHashMap<>();
 
@@ -41,21 +42,33 @@ public class CartServiceImpl implements CartService {
         return userCarts.computeIfAbsent(username, k -> new UserCart());
     }
 
+    //private static final BigDecimal TAX_RATE = BigDecimal.valueOf(0.16);
+
     @Override
     public CartResponse getCart(String username) {
         UserCart userCart = getUserCart(username);
         List<CartItemResponse> items = new ArrayList<>(userCart.items.values());
+
+        // Subtotal is tax-inclusive (what customers see as prices)
         BigDecimal subtotal = calculateSubtotal(items);
+
+        // Calculate the tax amount (16% of the pre-tax value)
+        BigDecimal preTaxAmount = subtotal.divide(BigDecimal.ONE.add(TAX_RATE), 2, RoundingMode.HALF_UP);
+        BigDecimal taxAmount = subtotal.subtract(preTaxAmount);
+
+        // Apply discounts to pre-tax amount
         BigDecimal discountAmount = calculateDiscount(userCart, items);
-        BigDecimal taxableAmount = subtotal.subtract(discountAmount);
-        BigDecimal taxAmount = calculateTax(taxableAmount);
+
+        // Total remains the same as subtotal (tax-inclusive)
+        BigDecimal total = subtotal;
 
         return CartResponse.builder()
                 .items(items)
-                .subtotal(subtotal)
-                .taxAmount(taxAmount)
+                .subtotal(subtotal)          // shows as "Subtotal (tax inclusive)"
                 .discountAmount(discountAmount)
-                .total(taxableAmount.add(taxAmount))
+                .taxAmount(taxAmount)         // shows the tax component
+                .total(total)                 // same as subtotal
+                .preTaxAmount(preTaxAmount)   // for internal calculations
                 .build();
     }
 
@@ -91,7 +104,7 @@ public class CartServiceImpl implements CartService {
             if (existingItem != null) {
                 int newQuantity = existingItem.getQuantity() + quantity;
                 existingItem.setQuantity(newQuantity);
-                existingItem.setTotalPrice(existingItem.getUnitPrice()
+                existingItem.setTotalPrice(BigDecimal.valueOf(product.getPrice())
                         .multiply(BigDecimal.valueOf(newQuantity)));
                 existingItem.setDiscountAmount(
                         existingItem.getDiscountAmount().add(itemDiscount)
@@ -101,9 +114,9 @@ public class CartServiceImpl implements CartService {
                         .productId(productId)
                         .productName(product.getName())
                         .quantity(quantity)
-                        .unitPrice(BigDecimal.valueOf(product.getPrice()))
+                        .unitPrice(BigDecimal.valueOf(product.getPrice()))  // tax-exclusive price
                         .totalPrice(BigDecimal.valueOf(product.getPrice())
-                                .multiply(BigDecimal.valueOf(quantity)))
+                                .multiply(BigDecimal.valueOf(quantity)))  // tax-exclusive total
                         .discountAmount(itemDiscount)
                         .build();
                 userCart.items.put(productId, newItem);

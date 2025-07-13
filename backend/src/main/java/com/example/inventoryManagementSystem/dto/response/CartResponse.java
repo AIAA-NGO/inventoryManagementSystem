@@ -11,8 +11,9 @@ import java.util.List;
 public class CartResponse {
     private Long cartId;
     private List<CartItemResponse> items;
-    private BigDecimal subtotal;
+    private BigDecimal subtotal;      // tax-exclusive amount
     private BigDecimal discountAmount;
     private BigDecimal taxAmount;
-    private BigDecimal total;
+    private BigDecimal total;        // tax-inclusive amount
+    private BigDecimal preTaxAmount; // same as subtotal (for internal use)
 }
