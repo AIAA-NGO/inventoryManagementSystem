@@ -92,16 +92,16 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    public Page<ProductResponse> getAllProducts(int page, int size) {
+        return productRepository.findAll(PageRequest.of(page, size))
+                .map(this::mapToProductResponse);
+    }
+
+    @Override
     public List<ProductResponse> getAllProductsList() {
         return productRepository.findAll().stream()
                 .map(this::mapToProductResponse)
                 .collect(Collectors.toList());
-    }
-
-    @Override
-    public Page<ProductResponse> getAllProducts(int page, int size) {
-        return productRepository.findAll(PageRequest.of(page, size))
-                .map(this::mapToProductResponse);
     }
 
     @Override
