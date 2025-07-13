@@ -7,12 +7,11 @@ import com.example.inventoryManagementSystem.dto.response.SaleResponse;
 import com.example.inventoryManagementSystem.exception.BusinessException;
 import com.example.inventoryManagementSystem.service.CartService;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Min;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.example.inventoryManagementSystem.service.SaleService;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -21,42 +20,61 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/cart")
-@RequiredArgsConstructor
 public class CartController {
     private final CartService cartService;
     private final SaleService saleService;
 
+    public CartController(CartService cartService, SaleService saleService) {
+        this.cartService = cartService;
+        this.saleService = saleService;
+    }
+
     @GetMapping
-    public ResponseEntity<CartResponse> getCart() {
-        return ResponseEntity.ok(cartService.getCart());
+    public ResponseEntity<CartResponse> getCart(@AuthenticationPrincipal UserDetails userDetails) {
+        String username = userDetails.getUsername();
+        return ResponseEntity.ok(cartService.getCart(username));
     }
 
     @PostMapping
-    public ResponseEntity<CartResponse> addItemsToCart(@Valid @RequestBody List<CartItemRequest> requests) {
-        return ResponseEntity.ok(cartService.addItemsToCart(requests));
+    public ResponseEntity<CartResponse> addItemsToCart(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody List<CartItemRequest> requests) {
+        String username = userDetails.getUsername();
+        return ResponseEntity.ok(cartService.addItemsToCart(username, requests));
     }
 
     @PutMapping("/{productId}")
     public ResponseEntity<CartItemResponse> updateCartItemQuantity(
+            @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long productId,
             @RequestBody UpdateCartItemRequest request) {
-        CartItemResponse response = cartService.updateCartItemQuantity(productId, request.getQuantity());
+        String username = userDetails.getUsername();
+        CartItemResponse response = cartService.updateCartItemQuantity(username, productId, request.getQuantity());
         return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{productId}")
-    public ResponseEntity<CartResponse> removeItemFromCart(@PathVariable Long productId) {
-        return ResponseEntity.ok(cartService.removeItemFromCart(productId));
+    public ResponseEntity<CartResponse> removeItemFromCart(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long productId) {
+        String username = userDetails.getUsername();
+        return ResponseEntity.ok(cartService.removeItemFromCart(username, productId));
     }
 
     @PostMapping("/apply-discount")
-    public ResponseEntity<CartResponse> applyDiscount(@Valid @RequestBody ApplyDiscountRequest request) {
-        return ResponseEntity.ok(cartService.applyDiscount(request.getDiscountCode()));
+    public ResponseEntity<CartResponse> applyDiscount(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody ApplyDiscountRequest request) {
+        String username = userDetails.getUsername();
+        return ResponseEntity.ok(cartService.applyDiscount(username, request.getDiscountCode()));
     }
 
     @PostMapping("/checkout")
-    public ResponseEntity<SaleResponse> checkout(@Valid @RequestBody CheckoutRequest request) {
-        CartResponse cart = cartService.getCart();
+    public ResponseEntity<SaleResponse> checkout(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody CheckoutRequest request) {
+        String username = userDetails.getUsername();
+        CartResponse cart = cartService.getCart(username);
 
         if (cart.getItems().isEmpty()) {
             throw new BusinessException("Cannot checkout empty cart");
@@ -71,18 +89,27 @@ public class CartController {
                     expectedTax + " but got: " + cart.getTaxAmount());
         }
 
-        SaleRequest saleRequest = SaleRequest.builder()
-                .customerId(request.getCustomerId())
-                .items(cart.getItems().stream()
-                        .map(item -> SaleItemRequest.builder()
-                                .productId(item.getProductId())
-                                .quantity(item.getQuantity())
-                                .build())
-                        .collect(Collectors.toList()))
-                .build();
+        List<SaleItemRequest> saleItems = cart.getItems().stream()
+                .map(item -> {
+                    SaleItemRequest saleItem = new SaleItemRequest();
+                    saleItem.setProductId(item.getProductId());
+                    saleItem.setQuantity(item.getQuantity());
+                    saleItem.setUnitPrice(item.getUnitPrice());
+                    saleItem.setDiscountAmount(item.getDiscountAmount());
+                    return saleItem;
+                })
+                .collect(Collectors.toList());
+
+        SaleRequest saleRequest = new SaleRequest();
+        saleRequest.setCustomerId(request.getCustomerId());
+        saleRequest.setItems(saleItems);
+        saleRequest.setSubtotal(cart.getSubtotal());
+        saleRequest.setDiscountAmount(cart.getDiscountAmount());
+        saleRequest.setTaxAmount(cart.getTaxAmount());
+        saleRequest.setTotal(cart.getTotal());
 
         SaleResponse response = saleService.createSale(saleRequest);
-        cartService.clearCart();
+        cartService.clearCart(username);
 
         return ResponseEntity.ok(response);
     }

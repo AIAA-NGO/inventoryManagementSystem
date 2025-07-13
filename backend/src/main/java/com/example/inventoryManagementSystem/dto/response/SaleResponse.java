@@ -1,13 +1,11 @@
 package com.example.inventoryManagementSystem.dto.response;
 
 import lombok.*;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
-@Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -22,9 +20,7 @@ public class SaleResponse {
     private BigDecimal total;
     private String status;
     private BigDecimal preTaxAmount;
-
     private BigDecimal profit;
-
-
-
+    private String paymentMethod;
+    private String transactionReference;
 }

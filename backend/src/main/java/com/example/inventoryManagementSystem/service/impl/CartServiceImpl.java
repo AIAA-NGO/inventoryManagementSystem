@@ -12,7 +12,7 @@ import com.example.inventoryManagementSystem.repository.ProductRepository;
 import com.example.inventoryManagementSystem.service.CartService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.web.context.annotation.SessionScope;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -22,45 +22,54 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
-@SessionScope
 @RequiredArgsConstructor
 public class CartServiceImpl implements CartService {
     private final ProductRepository productRepository;
     private final DiscountRepository discountRepository;
 
-    private final Map<Long, CartItemResponse> cartItems = new ConcurrentHashMap<>();
-    private String appliedDiscountCode;
-    private final Long sessionCartId = (long) System.identityHashCode(this);
-    private static final BigDecimal TAX_RATE = BigDecimal.valueOf(0.16); // 16% tax
+    // Store carts in memory with username as key
+    private final Map<String, UserCart> userCarts = new ConcurrentHashMap<>();
+
+    private static final BigDecimal TAX_RATE = BigDecimal.valueOf(0.16);
+
+    private static class UserCart {
+        Map<Long, CartItemResponse> items = new ConcurrentHashMap<>();
+        String appliedDiscountCode;
+    }
+
+    private UserCart getUserCart(String username) {
+        return userCarts.computeIfAbsent(username, k -> new UserCart());
+    }
 
     @Override
-    public CartResponse getCart() {
-        List<CartItemResponse> items = new ArrayList<>(cartItems.values());
+    public CartResponse getCart(String username) {
+        UserCart userCart = getUserCart(username);
+        List<CartItemResponse> items = new ArrayList<>(userCart.items.values());
         BigDecimal subtotal = calculateSubtotal(items);
-        BigDecimal discountAmount = calculateDiscount(items);
+        BigDecimal discountAmount = calculateDiscount(userCart, items);
         BigDecimal taxableAmount = subtotal.subtract(discountAmount);
         BigDecimal taxAmount = calculateTax(taxableAmount);
 
-        // Calculate the pre-tax subtotal (subtotal minus tax)
-        BigDecimal preTaxSubtotal = taxableAmount.subtract(taxAmount);
-
         return CartResponse.builder()
-                .cartId(sessionCartId)
                 .items(items)
-                .subtotal(preTaxSubtotal) // Show subtotal as amount before tax
+                .subtotal(subtotal)
                 .taxAmount(taxAmount)
                 .discountAmount(discountAmount)
-                .total(taxableAmount) // Total is the amount before tax + tax
+                .total(taxableAmount.add(taxAmount))
                 .build();
-    }
-    @Override
-    public CartResponse addItemToCart(CartItemRequest request) {
-        return addItemsToCart(List.of(request));
     }
 
     @Override
-    public CartResponse addItemsToCart(List<CartItemRequest> requests) {
-        validateQuantitiesAgainstStock(requests);
+    @Transactional
+    public CartResponse addItemToCart(String username, CartItemRequest request) {
+        return addItemsToCart(username, Collections.singletonList(request));
+    }
+
+    @Override
+    @Transactional
+    public CartResponse addItemsToCart(String username, List<CartItemRequest> requests) {
+        UserCart userCart = getUserCart(username);
+        validateQuantitiesAgainstStock(username, requests);
 
         Map<Long, Integer> quantityMap = requests.stream()
                 .collect(Collectors.toMap(
@@ -77,7 +86,7 @@ public class CartServiceImpl implements CartService {
             BigDecimal itemDiscount = calculateMaxDiscount(BigDecimal.valueOf(product.getPrice()), discounts)
                     .multiply(BigDecimal.valueOf(quantity));
 
-            CartItemResponse existingItem = cartItems.get(productId);
+            CartItemResponse existingItem = userCart.items.get(productId);
 
             if (existingItem != null) {
                 int newQuantity = existingItem.getQuantity() + quantity;
@@ -97,14 +106,15 @@ public class CartServiceImpl implements CartService {
                                 .multiply(BigDecimal.valueOf(quantity)))
                         .discountAmount(itemDiscount)
                         .build();
-                cartItems.put(productId, newItem);
+                userCart.items.put(productId, newItem);
             }
         });
 
-        return getCart();
+        return getCart(username);
     }
 
-    private void validateQuantitiesAgainstStock(List<CartItemRequest> requests) {
+    private void validateQuantitiesAgainstStock(String username, List<CartItemRequest> requests) {
+        UserCart userCart = getUserCart(username);
         Map<Long, Integer> requestedQuantities = requests.stream()
                 .collect(Collectors.groupingBy(
                         CartItemRequest::getProductId,
@@ -118,7 +128,8 @@ public class CartServiceImpl implements CartService {
             Product product = productRepository.findById(productId)
                     .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
 
-            int currentQuantityInCart = cartItems.containsKey(productId) ? cartItems.get(productId).getQuantity() : 0;
+            int currentQuantityInCart = userCart.items.containsKey(productId) ?
+                    userCart.items.get(productId).getQuantity() : 0;
             int totalQuantityAfterAddition = currentQuantityInCart + requestedQuantity;
 
             if (totalQuantityAfterAddition > product.getQuantityInStock()) {
@@ -138,8 +149,9 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
-    public CartItemResponse updateCartItemQuantity(Long productId, int newQuantity) {
-        if (!cartItems.containsKey(productId)) {
+    public CartItemResponse updateCartItemQuantity(String username, Long productId, int newQuantity) {
+        UserCart userCart = getUserCart(username);
+        if (!userCart.items.containsKey(productId)) {
             throw new ResourceNotFoundException("Cart item not found");
         }
 
@@ -157,7 +169,7 @@ public class CartServiceImpl implements CartService {
         BigDecimal itemDiscount = calculateMaxDiscount(BigDecimal.valueOf(product.getPrice()), discounts)
                 .multiply(BigDecimal.valueOf(newQuantity));
 
-        CartItemResponse item = cartItems.get(productId);
+        CartItemResponse item = userCart.items.get(productId);
         item.setQuantity(newQuantity);
         item.setTotalPrice(item.getUnitPrice().multiply(BigDecimal.valueOf(newQuantity)));
         item.setDiscountAmount(itemDiscount);
@@ -166,19 +178,21 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
-    public CartResponse updateItemQuantity(Long productId, int quantity) {
-        updateCartItemQuantity(productId, quantity);
-        return getCart();
+    public CartResponse updateItemQuantity(String username, Long productId, int quantity) {
+        updateCartItemQuantity(username, productId, quantity);
+        return getCart(username);
     }
 
     @Override
-    public CartResponse removeItemFromCart(Long productId) {
-        cartItems.remove(productId);
-        return getCart();
+    public CartResponse removeItemFromCart(String username, Long productId) {
+        UserCart userCart = getUserCart(username);
+        userCart.items.remove(productId);
+        return getCart(username);
     }
 
     @Override
-    public CartResponse applyDiscount(String discountCode) {
+    public CartResponse applyDiscount(String username, String discountCode) {
+        UserCart userCart = getUserCart(username);
         Discount discount = discountRepository.findByCode(discountCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Discount not found"));
 
@@ -188,14 +202,15 @@ public class CartServiceImpl implements CartService {
             throw new BusinessException("Discount is not valid");
         }
 
-        this.appliedDiscountCode = discountCode;
-        return getCart();
+        userCart.appliedDiscountCode = discountCode;
+        return getCart(username);
     }
 
     @Override
-    public void clearCart() {
-        cartItems.clear();
-        appliedDiscountCode = null;
+    public void clearCart(String username) {
+        UserCart userCart = getUserCart(username);
+        userCart.items.clear();
+        userCart.appliedDiscountCode = null;
     }
 
     private BigDecimal calculateSubtotal(List<CartItemResponse> items) {
@@ -204,14 +219,14 @@ public class CartServiceImpl implements CartService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private BigDecimal calculateDiscount(List<CartItemResponse> items) {
+    private BigDecimal calculateDiscount(UserCart userCart, List<CartItemResponse> items) {
         BigDecimal productDiscounts = items.stream()
                 .map(CartItemResponse::getDiscountAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        if (appliedDiscountCode == null) return productDiscounts;
+        if (userCart.appliedDiscountCode == null) return productDiscounts;
 
-        Discount discount = discountRepository.findByCode(appliedDiscountCode)
+        Discount discount = discountRepository.findByCode(userCart.appliedDiscountCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Discount not found"));
 
         BigDecimal subtotal = calculateSubtotal(items);
@@ -223,9 +238,5 @@ public class CartServiceImpl implements CartService {
     private BigDecimal calculateTax(BigDecimal taxableAmount) {
         return taxableAmount.multiply(TAX_RATE)
                 .setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private BigDecimal calculateTotal(BigDecimal subtotal) {
-        return subtotal; // Total equals subtotal (tax inclusive)
     }
 }
