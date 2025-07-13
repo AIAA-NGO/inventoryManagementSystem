@@ -224,4 +224,8 @@ public class CartServiceImpl implements CartService {
         return taxableAmount.multiply(TAX_RATE)
                 .setScale(2, RoundingMode.HALF_UP);
     }
+
+    private BigDecimal calculateTotal(BigDecimal subtotal) {
+        return subtotal; // Total equals subtotal (tax inclusive)
+    }
 }
