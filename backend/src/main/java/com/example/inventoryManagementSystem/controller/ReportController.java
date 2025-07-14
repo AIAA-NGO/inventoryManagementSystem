@@ -81,12 +81,7 @@ public class ReportController {
 //        return ResponseEntity.ok(reportService.generateProfitLossReport(startDate, endDate));
 //    }
 
-    @GetMapping("/financial/tax")
-    public ResponseEntity<TaxReportResponse> getTaxReport(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        return ResponseEntity.ok(reportService.generateTaxReport(startDate, endDate));
-    }
+
 
     @GetMapping("/financial/cash-flow")
     public ResponseEntity<CashFlowResponse> getCashFlowReport(

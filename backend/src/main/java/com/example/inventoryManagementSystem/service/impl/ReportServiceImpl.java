@@ -66,13 +66,7 @@ public class ReportServiceImpl implements ReportService {
                                             .filter(Objects::nonNull)
                                             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-                                    BigDecimal totalTax = saleList.stream()
-                                            .map(Sale::getTaxAmount)
-                                            .filter(Objects::nonNull)
-                                            .reduce(BigDecimal.ZERO, BigDecimal::add);
-
                                     response.setTotalSales(subtotal);
-                                    response.setTotalTax(totalTax);
                                     response.setTotalProfit(calculateTotalProfit(saleList));
                                     response.setGrossProfit(calculateGrossProfit(saleList));
                                     response.setNetProfit(calculateNetProfit(saleList));
@@ -108,11 +102,6 @@ public class ReportServiceImpl implements ReportService {
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal totalTax = sales.stream()
-                .map(Sale::getTaxAmount)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
         BigDecimal totalProfit = calculateTotalProfit(sales);
         BigDecimal grossProfit = calculateGrossProfit(sales);
         BigDecimal netProfit = calculateNetProfit(sales);
@@ -123,7 +112,6 @@ public class ReportServiceImpl implements ReportService {
                 .totalOrders(totalOrders)
                 .newCustomers(newCustomers)
                 .totalRevenue(totalRevenue)
-                .totalTax(totalTax)
                 .totalProfit(totalProfit)
                 .grossProfit(grossProfit)
                 .netProfit(netProfit)
@@ -297,7 +285,6 @@ public class ReportServiceImpl implements ReportService {
         try {
             logger.info("Generating profit/loss report for startDate: {}, endDate: {}", startDate, endDate);
 
-            // Validate dates
             if (startDate == null) {
                 startDate = LocalDate.now().minusMonths(1);
             }
@@ -318,19 +305,16 @@ public class ReportServiceImpl implements ReportService {
             LocalDateTime startDateTime = startDate.atStartOfDay();
             LocalDateTime endDateTime = endDate.atTime(23, 59, 59);
 
-            // Fetch completed sales
             List<Sale> sales = saleRepository.findBySaleDateBetween(startDateTime, endDateTime)
                     .stream()
                     .filter(sale -> sale.getStatus() == Sale.SaleStatus.COMPLETED)
                     .collect(Collectors.toList());
 
-            // Revenue Calculations
             BigDecimal totalRevenue = sales.stream()
                     .map(sale -> sale.getSubtotal() != null ? sale.getSubtotal() : BigDecimal.ZERO)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             response.setTotalRevenue(totalRevenue);
 
-            // Cost of Goods Sold
             BigDecimal totalCOGS = BigDecimal.ZERO;
             for (Sale sale : sales) {
                 List<SaleItem> saleItems = saleItemRepository.findBySale_Id(sale.getId());
@@ -344,30 +328,18 @@ public class ReportServiceImpl implements ReportService {
             }
             response.setTotalCost(totalCOGS);
 
-            // Gross Profit
             BigDecimal grossProfit = totalRevenue.subtract(totalCOGS);
             response.setGrossProfit(grossProfit);
 
-            // Operating Expenses
             BigDecimal operatingExpenses = calculateTotalExpenses(startDate, endDate);
             response.setExpenses(operatingExpenses);
 
-            // Net Profit Before Tax
-            BigDecimal netProfitBeforeTax = grossProfit
+            BigDecimal netProfit = grossProfit
                     .add(response.getOtherIncome())
                     .subtract(operatingExpenses)
                     .subtract(response.getOtherExpenses());
-            response.setNetProfitBeforeTax(netProfitBeforeTax);
-
-            // Tax Calculation (simplified - you might have more complex tax logic)
-            BigDecimal taxAmount = netProfitBeforeTax.multiply(BigDecimal.valueOf(0.2)); // Assuming 20% tax rate
-            response.setTaxAmount(taxAmount);
-
-            // Net Profit
-            BigDecimal netProfit = netProfitBeforeTax.subtract(taxAmount);
             response.setNetProfit(netProfit);
 
-            // Calculate percentages
             if (totalRevenue.compareTo(BigDecimal.ZERO) != 0) {
                 response.setGrossMarginPercentage(
                         grossProfit.divide(totalRevenue, 4, RoundingMode.HALF_UP));
@@ -386,37 +358,6 @@ public class ReportServiceImpl implements ReportService {
     }
 
     @Override
-    public TaxReportResponse generateTaxReport(LocalDate startDate, LocalDate endDate) {
-        LocalDateTime startDateTime = startDate != null ? startDate.atStartOfDay() : LocalDateTime.MIN;
-        LocalDateTime endDateTime = endDate != null ? endDate.atTime(23, 59, 59) : LocalDateTime.now();
-
-        TaxReportResponse response = new TaxReportResponse();
-        response.setPeriodStart(startDate != null ? startDate : LocalDate.MIN);
-        response.setPeriodEnd(endDate != null ? endDate : LocalDate.now());
-
-        List<Sale> sales = saleRepository.findBySaleDateBetween(startDateTime, endDateTime)
-                .stream()
-                .filter(sale -> sale.getStatus() == Sale.SaleStatus.COMPLETED)
-                .collect(Collectors.toList());
-
-        BigDecimal taxableSales = sales.stream()
-                .map(sale -> sale.getSubtotal() != null ? sale.getSubtotal() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        response.setTaxableSales(taxableSales);
-
-        BigDecimal taxCollected = sales.stream()
-                .map(sale -> sale.getTaxAmount() != null ? sale.getTaxAmount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        response.setTaxCollected(taxCollected);
-
-        BigDecimal taxCredits = BigDecimal.ZERO;
-        BigDecimal taxLiability = taxCollected.subtract(taxCredits);
-        response.setTaxLiability(taxLiability);
-
-        return response;
-    }
-
-    @Override
     public CashFlowResponse generateCashFlowReport(LocalDate startDate, LocalDate endDate) {
         LocalDateTime startDateTime = startDate != null ? startDate.atStartOfDay() : LocalDateTime.MIN;
         LocalDateTime endDateTime = endDate != null ? endDate.atTime(23, 59, 59) : LocalDateTime.now();
@@ -425,7 +366,6 @@ public class ReportServiceImpl implements ReportService {
         response.setPeriodStart(startDate != null ? startDate : LocalDate.MIN);
         response.setPeriodEnd(endDate != null ? endDate : LocalDate.now());
 
-        // Cash inflows (sales)
         BigDecimal salesRevenue = saleRepository.findBySaleDateBetween(startDateTime, endDateTime)
                 .stream()
                 .filter(sale -> sale.getStatus() == Sale.SaleStatus.COMPLETED)
@@ -434,7 +374,6 @@ public class ReportServiceImpl implements ReportService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         response.setCashInflows(salesRevenue);
 
-        // Cash outflows (purchases and expenses)
         BigDecimal purchaseOutflows = purchaseRepository.findByOrderDateBetween(startDateTime, endDateTime)
                 .stream()
                 .filter(purchase -> purchase.getStatus() == Purchase.PurchaseStatus.RECEIVED)
@@ -446,7 +385,6 @@ public class ReportServiceImpl implements ReportService {
         BigDecimal totalOutflows = purchaseOutflows.add(expenseOutflows);
         response.setCashOutflows(totalOutflows);
 
-        // Net cash flow
         BigDecimal netCashFlow = salesRevenue.subtract(totalOutflows);
         response.setNetCashFlow(netCashFlow);
 
@@ -562,8 +500,6 @@ public class ReportServiceImpl implements ReportService {
                 .totalCostOfGoodsSold(pl.getTotalCost())
                 .grossProfit(pl.getGrossProfit())
                 .operatingExpenses(pl.getExpenses())
-                .netProfitBeforeTax(pl.getNetProfitBeforeTax())
-                .taxExpense(pl.getTaxAmount())
                 .netProfit(pl.getNetProfit())
                 .grossMarginPercentage(pl.getGrossMarginPercentage())
                 .netProfitPercentage(pl.getNetProfitPercentage())
@@ -775,10 +711,6 @@ public class ReportServiceImpl implements ReportService {
                     ProfitLossResponse profitLossData = generateProfitLossReport(request.getStartDate(), request.getEndDate());
                     createProfitLossExcelSheet(sheet, headerRow, headerStyle, profitLossData);
                     break;
-                case TAX:
-                    TaxReportResponse taxData = generateTaxReport(request.getStartDate(), request.getEndDate());
-                    createTaxExcelSheet(sheet, headerRow, headerStyle, taxData);
-                    break;
                 case CASH_FLOW:
                     CashFlowResponse cashFlowData = generateCashFlowReport(request.getStartDate(), request.getEndDate());
                     createCashFlowExcelSheet(sheet, headerRow, headerStyle, cashFlowData);
@@ -812,7 +744,7 @@ public class ReportServiceImpl implements ReportService {
     }
 
     private void createSalesExcelSheet(Sheet sheet, Row headerRow, CellStyle headerStyle, List<SalesReportResponse> data) {
-        String[] headers = {"Date", "Orders", "Total Sales", "Total Tax", "Gross Profit", "Net Profit"};
+        String[] headers = {"Date", "Orders", "Total Sales", "Gross Profit", "Net Profit"};
         for (int i = 0; i < headers.length; i++) {
             Cell cell = headerRow.createCell(i);
             cell.setCellValue(headers[i]);
@@ -825,9 +757,8 @@ public class ReportServiceImpl implements ReportService {
             row.createCell(0).setCellValue(item.getDate().toString());
             row.createCell(1).setCellValue(item.getOrderCount());
             row.createCell(2).setCellValue(item.getTotalSales().doubleValue());
-            row.createCell(3).setCellValue(item.getTotalTax().doubleValue());
-            row.createCell(4).setCellValue(item.getGrossProfit().doubleValue());
-            row.createCell(5).setCellValue(item.getNetProfit().doubleValue());
+            row.createCell(3).setCellValue(item.getGrossProfit().doubleValue());
+            row.createCell(4).setCellValue(item.getNetProfit().doubleValue());
         }
     }
 
@@ -845,7 +776,6 @@ public class ReportServiceImpl implements ReportService {
         createRow(sheet, rowNum++, "Total Orders", data.getTotalOrders());
         createRow(sheet, rowNum++, "New Customers", data.getNewCustomers());
         createRow(sheet, rowNum++, "Total Revenue", data.getTotalRevenue());
-        createRow(sheet, rowNum++, "Total Tax", data.getTotalTax());
         createRow(sheet, rowNum++, "Total Profit", data.getTotalProfit());
         createRow(sheet, rowNum++, "Gross Profit", data.getGrossProfit());
         createRow(sheet, rowNum++, "Net Profit", data.getNetProfit());
@@ -968,28 +898,9 @@ public class ReportServiceImpl implements ReportService {
         createRow(sheet, rowNum++, "Operating Expenses", data.getExpenses());
         createRow(sheet, rowNum++, "Other Income", data.getOtherIncome());
         createRow(sheet, rowNum++, "Other Expenses", data.getOtherExpenses());
-        createRow(sheet, rowNum++, "Net Profit Before Tax", data.getNetProfitBeforeTax());
-        createRow(sheet, rowNum++, "Tax Amount", data.getTaxAmount());
         createRow(sheet, rowNum++, "Net Profit", data.getNetProfit());
         createRow(sheet, rowNum++, "Gross Margin %", data.getGrossMarginPercentage().multiply(BigDecimal.valueOf(100)));
         createRow(sheet, rowNum++, "Net Profit %", data.getNetProfitPercentage().multiply(BigDecimal.valueOf(100)));
-    }
-
-    private void createTaxExcelSheet(Sheet sheet, Row headerRow, CellStyle headerStyle, TaxReportResponse data) {
-        String[] headers = {"Metric", "Amount"};
-        for (int i = 0; i < headers.length; i++) {
-            Cell cell = headerRow.createCell(i);
-            cell.setCellValue(headers[i]);
-            cell.setCellStyle(headerStyle);
-        }
-
-        int rowNum = 1;
-        createRow(sheet, rowNum++, "Period Start", data.getPeriodStart().toString());
-        createRow(sheet, rowNum++, "Period End", data.getPeriodEnd().toString());
-        createRow(sheet, rowNum++, "Taxable Sales", data.getTaxableSales());
-        createRow(sheet, rowNum++, "Tax Collected", data.getTaxCollected());
-        createRow(sheet, rowNum++, "Tax Credits", data.getTaxCredits());
-        createRow(sheet, rowNum++, "Tax Liability", data.getTaxLiability());
     }
 
     private void createCashFlowExcelSheet(Sheet sheet, Row headerRow, CellStyle headerStyle, CashFlowResponse data) {
@@ -1042,8 +953,6 @@ public class ReportServiceImpl implements ReportService {
         createRow(sheet, rowNum++, "Cost of Goods Sold", data.getTotalCostOfGoodsSold());
         createRow(sheet, rowNum++, "Gross Profit", data.getGrossProfit());
         createRow(sheet, rowNum++, "Operating Expenses", data.getOperatingExpenses());
-        createRow(sheet, rowNum++, "Net Profit Before Tax", data.getNetProfitBeforeTax());
-        createRow(sheet, rowNum++, "Tax Expense", data.getTaxExpense());
         createRow(sheet, rowNum++, "Net Profit", data.getNetProfit());
         createRow(sheet, rowNum++, "Gross Margin %", data.getGrossMarginPercentage().multiply(BigDecimal.valueOf(100)));
         createRow(sheet, rowNum++, "Net Profit %", data.getNetProfitPercentage().multiply(BigDecimal.valueOf(100)));
@@ -1087,14 +996,17 @@ public class ReportServiceImpl implements ReportService {
     }
 
     private byte[] generatePdfReport(ExportReportRequest request) {
+        // TODO: Implement PDF generation logic
         return new byte[0];
     }
 
     private byte[] generateDashboardPdf(DashboardResponse data) {
+        // TODO: Implement Dashboard PDF generation logic
         return new byte[0];
     }
 
     private byte[] generateCsvReport(ExportReportRequest request) {
+        // TODO: Implement CSV generation logic
         return new byte[0];
     }
 

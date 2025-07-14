@@ -14,9 +14,8 @@ public class DailySummaryResponse {
     private LocalDate date;
     private int totalSales;
     private BigDecimal totalRevenue;
+    private BigDecimal totalDiscount;
     private BigDecimal totalTax;
-    private List<SaleSummary> sales;
-
     private BigDecimal totalProfit;
-
+    private List<SaleSummary> sales;
 }

@@ -4,13 +4,11 @@ import com.example.inventoryManagementSystem.dto.request.ApplyDiscountRequest;
 import com.example.inventoryManagementSystem.dto.request.SaleRequest;
 import com.example.inventoryManagementSystem.dto.response.*;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
 public interface SaleService {
-    BigDecimal getTotalProfit();
     SaleResponse createSale(SaleRequest request);
     List<SaleResponse> getAllSales(LocalDate startDate, LocalDate endDate);
     SaleResponse getSaleById(Long id);

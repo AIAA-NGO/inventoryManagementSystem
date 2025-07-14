@@ -100,9 +100,6 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
     @Query("SELECT s FROM Sale s WHERE s.status = 'COMPLETED' ORDER BY s.saleDate DESC")
     List<Sale> findRecentCompletedSales();
 
-    @Query("SELECT COALESCE(SUM(s.taxAmount), 0) FROM Sale s WHERE s.status = 'COMPLETED'")
-    BigDecimal getCompletedSalesTaxAmount();
-
     @Query("SELECT s FROM Sale s JOIN FETCH s.items WHERE s.customer.id = :customerId")
     List<Sale> findByCustomerWithItems(@Param("customerId") Long customerId);
 

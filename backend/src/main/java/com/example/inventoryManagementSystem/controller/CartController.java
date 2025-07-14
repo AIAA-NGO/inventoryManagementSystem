@@ -13,8 +13,6 @@ import com.example.inventoryManagementSystem.service.SaleService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -80,15 +78,6 @@ public class CartController {
             throw new BusinessException("Cannot checkout empty cart");
         }
 
-        BigDecimal taxableAmount = cart.getSubtotal().subtract(cart.getDiscountAmount());
-        BigDecimal expectedTax = taxableAmount.multiply(BigDecimal.valueOf(0.16))
-                .setScale(2, RoundingMode.HALF_UP);
-
-        if (cart.getTaxAmount().compareTo(expectedTax) != 0) {
-            throw new BusinessException("Invalid tax calculation in cart. Expected: " +
-                    expectedTax + " but got: " + cart.getTaxAmount());
-        }
-
         List<SaleItemRequest> saleItems = cart.getItems().stream()
                 .map(item -> {
                     SaleItemRequest saleItem = new SaleItemRequest();
@@ -105,7 +94,6 @@ public class CartController {
         saleRequest.setItems(saleItems);
         saleRequest.setSubtotal(cart.getSubtotal());
         saleRequest.setDiscountAmount(cart.getDiscountAmount());
-        saleRequest.setTaxAmount(cart.getTaxAmount());
         saleRequest.setTotal(cart.getTotal());
 
         SaleResponse response = saleService.createSale(saleRequest);

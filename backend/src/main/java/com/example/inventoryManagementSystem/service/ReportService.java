@@ -24,7 +24,6 @@ public interface ReportService {
 
     // Financial Reports
     ProfitLossResponse generateProfitLossReport(LocalDate startDate, LocalDate endDate);
-    TaxReportResponse generateTaxReport(LocalDate startDate, LocalDate endDate);
     CashFlowResponse generateCashFlowReport(LocalDate startDate, LocalDate endDate);
 
     // Supplier Reports
@@ -39,6 +38,4 @@ public interface ReportService {
     // Export Functionality
     ResponseEntity<Resource> exportReport(ExportReportRequest request);
     ResponseEntity<Resource> exportDashboardAsPdf(LocalDate startDate, LocalDate endDate);
-
-
 }
