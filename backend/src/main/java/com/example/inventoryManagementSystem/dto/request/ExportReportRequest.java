@@ -1,21 +1,40 @@
-
 package com.example.inventoryManagementSystem.dto.request;
 
 import lombok.Data;
+import javax.validation.constraints.NotNull;
 import java.time.LocalDate;
 
 @Data
 public class ExportReportRequest {
+    @NotNull(message = "Report type is required")
     private ReportType reportType;
+
+    @NotNull(message = "Format type is required")
     private FormatType format;
+
     private LocalDate startDate;
     private LocalDate endDate;
 
     public enum ReportType {
-        SALES, PRODUCTS, INVENTORY, PROFIT_LOSS, TAX, SUPPLIERS, PRODUCT_SALES_TREND, LOW_STOCK, SALES_TREND, CASH_FLOW, SUPPLIER_PURCHASES, EXPIRING_ITEMS, SALES_SUMMARY, BUSINESS_PERFORMANCE
+        PROFIT_LOSS,
+        SALES,
+        SALES_SUMMARY,
+        PRODUCTS,
+        PRODUCT_SALES_TREND,
+        INVENTORY,
+        LOW_STOCK,
+        EXPIRING_ITEMS,
+        SUPPLIERS,
+        SUPPLIER_PURCHASES,
+        CASH_FLOW,
+        BUSINESS_PERFORMANCE,
+        SALES_TREND,
+        DAILY_SUMMARY
     }
 
     public enum FormatType {
-        PDF, EXCEL, CSV
+        PDF,
+        EXCEL,
+        CSV
     }
 }
