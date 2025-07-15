@@ -41,125 +41,6 @@ public class ReportServiceImpl implements ReportService {
     private final ExpenseRepository expenseRepository;
 
     @Override
-    public ProfitLossResponse generateProfitLossReport(LocalDate startDate, LocalDate endDate) {
-        try {
-            logger.info("Generating profit/loss report for startDate: {}, endDate: {}", startDate, endDate);
-
-            if (startDate == null) {
-                startDate = LocalDate.now().minusMonths(1);
-            }
-            if (endDate == null) {
-                endDate = LocalDate.now();
-            }
-            if (startDate.isAfter(endDate)) {
-                throw new IllegalArgumentException("Start date cannot be after end date");
-            }
-
-            ProfitLossResponse response = ProfitLossResponse.builder()
-                    .periodStart(startDate)
-                    .periodEnd(endDate)
-                    .build();
-
-            LocalDateTime startDateTime = startDate.atStartOfDay();
-            LocalDateTime endDateTime = endDate.atTime(23, 59, 59);
-
-            // Calculate inventory values
-            BigDecimal beginningInventory = calculateInventoryValue(startDate.minusDays(1));
-            BigDecimal endingInventory = calculateInventoryValue(endDate);
-            BigDecimal purchases = calculatePurchases(startDate, endDate);
-
-            List<Sale> sales = saleRepository.findBySaleDateBetween(startDateTime, endDateTime)
-                    .stream()
-                    .filter(sale -> sale.getStatus() == Sale.SaleStatus.COMPLETED)
-                    .collect(Collectors.toList());
-
-            BigDecimal totalRevenue = sales.stream()
-                    .map(sale -> sale.getSubtotal() != null ? sale.getSubtotal() : BigDecimal.ZERO)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            response.setTotalRevenue(totalRevenue);
-
-            // Calculate COGS: Beginning Inventory + Purchases - Ending Inventory
-            BigDecimal totalCOGS = beginningInventory.add(purchases).subtract(endingInventory);
-            response.setTotalCost(totalCOGS);
-            response.setBeginningInventory(beginningInventory);
-            response.setPurchases(purchases);
-            response.setEndingInventory(endingInventory);
-
-            BigDecimal grossProfit = totalRevenue.subtract(totalCOGS);
-            response.setGrossProfit(grossProfit);
-
-            BigDecimal operatingExpenses = calculateTotalExpenses(startDate, endDate);
-            response.setExpenses(operatingExpenses);
-
-            // Calculate other income (e.g., from miscellaneous sources)
-            BigDecimal otherIncome = calculateOtherIncome(startDate, endDate);
-            response.setOtherIncome(otherIncome);
-
-            // Calculate other expenses (non-operating)
-            BigDecimal otherExpenses = calculateOtherExpenses(startDate, endDate);
-            response.setOtherExpenses(otherExpenses);
-
-            // Calculate taxes (placeholder - implement actual tax logic if needed)
-            BigDecimal taxes = BigDecimal.ZERO;
-            response.setTaxes(taxes);
-
-            BigDecimal netProfit = grossProfit
-                    .add(otherIncome)
-                    .subtract(operatingExpenses)
-                    .subtract(otherExpenses)
-                    .subtract(taxes);
-            response.setNetProfit(netProfit);
-
-            if (totalRevenue.compareTo(BigDecimal.ZERO) != 0) {
-                response.setGrossMarginPercentage(
-                        grossProfit.divide(totalRevenue, 4, RoundingMode.HALF_UP));
-                response.setNetProfitPercentage(
-                        netProfit.divide(totalRevenue, 4, RoundingMode.HALF_UP));
-            } else {
-                response.setGrossMarginPercentage(BigDecimal.ZERO);
-                response.setNetProfitPercentage(BigDecimal.ZERO);
-            }
-
-            return response;
-        } catch (Exception e) {
-            logger.error("Error generating profit/loss report: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to generate profit/loss report: " + e.getMessage(), e);
-        }
-    }
-
-    private BigDecimal calculateInventoryValue(LocalDate date) {
-        LocalDateTime dateTime = date.atTime(23, 59, 59);
-        return productRepository.findAll().stream()
-                .map(product -> {
-                    BigDecimal costPrice = product.getCostPrice() != null ?
-                            BigDecimal.valueOf(product.getCostPrice()) : BigDecimal.ZERO;
-                    return costPrice.multiply(BigDecimal.valueOf(product.getQuantityInStock()));
-                })
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private BigDecimal calculatePurchases(LocalDate startDate, LocalDate endDate) {
-        LocalDateTime startDateTime = startDate.atStartOfDay();
-        LocalDateTime endDateTime = endDate.atTime(23, 59, 59);
-        return purchaseRepository.findByOrderDateBetween(startDateTime, endDateTime)
-                .stream()
-                .filter(purchase -> purchase.getStatus() == Purchase.PurchaseStatus.RECEIVED)
-                .map(Purchase::getTotalAmount)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private BigDecimal calculateOtherIncome(LocalDate startDate, LocalDate endDate) {
-        // Placeholder: Implement logic to fetch other income (e.g., interest, rentals)
-        return BigDecimal.ZERO;
-    }
-
-    private BigDecimal calculateOtherExpenses(LocalDate startDate, LocalDate endDate) {
-        // Placeholder: Implement logic to fetch non-operating expenses
-        return BigDecimal.ZERO;
-    }
-
-    @Override
     public List<SalesReportResponse> generateSalesReport(LocalDate startDate, LocalDate endDate, String statusFilter) {
         LocalDateTime startDateTime = startDate != null ? startDate.atStartOfDay() : LocalDateTime.MIN;
         LocalDateTime endDateTime = endDate != null ? endDate.atTime(23, 59, 59) : LocalDateTime.now();
@@ -199,7 +80,6 @@ public class ReportServiceImpl implements ReportService {
                 .collect(Collectors.toList());
     }
 
-    // Other methods remain unchanged, included for completeness
     @Override
     public SalesSummaryResponse generateSalesSummaryReport(LocalDate startDate, LocalDate endDate) {
         LocalDateTime startDateTime = startDate != null ? startDate.atStartOfDay() : LocalDateTime.MIN;
@@ -398,6 +278,83 @@ public class ReportServiceImpl implements ReportService {
                         .build())
                 .sorted(Comparator.comparing(ExpiringItemsReportResponse::getDaysUntilExpiry))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public ProfitLossResponse generateProfitLossReport(LocalDate startDate, LocalDate endDate) {
+        try {
+            logger.info("Generating profit/loss report for startDate: {}, endDate: {}", startDate, endDate);
+
+            if (startDate == null) {
+                startDate = LocalDate.now().minusMonths(1);
+            }
+            if (endDate == null) {
+                endDate = LocalDate.now();
+            }
+            if (startDate.isAfter(endDate)) {
+                throw new IllegalArgumentException("Start date cannot be after end date");
+            }
+
+            ProfitLossResponse response = ProfitLossResponse.builder()
+                    .periodStart(startDate)
+                    .periodEnd(endDate)
+                    .otherIncome(BigDecimal.ZERO)
+                    .otherExpenses(BigDecimal.ZERO)
+                    .build();
+
+            LocalDateTime startDateTime = startDate.atStartOfDay();
+            LocalDateTime endDateTime = endDate.atTime(23, 59, 59);
+
+            List<Sale> sales = saleRepository.findBySaleDateBetween(startDateTime, endDateTime)
+                    .stream()
+                    .filter(sale -> sale.getStatus() == Sale.SaleStatus.COMPLETED)
+                    .collect(Collectors.toList());
+
+            BigDecimal totalRevenue = sales.stream()
+                    .map(sale -> sale.getSubtotal() != null ? sale.getSubtotal() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            response.setTotalRevenue(totalRevenue);
+
+            BigDecimal totalCOGS = BigDecimal.ZERO;
+            for (Sale sale : sales) {
+                List<SaleItem> saleItems = saleItemRepository.findBySale_Id(sale.getId());
+                for (SaleItem item : saleItems) {
+                    if (item.getProduct() != null && item.getProduct().getCostPrice() != null) {
+                        BigDecimal costPrice = BigDecimal.valueOf(item.getProduct().getCostPrice());
+                        BigDecimal itemCost = costPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
+                        totalCOGS = totalCOGS.add(itemCost);
+                    }
+                }
+            }
+            response.setTotalCost(totalCOGS);
+
+            BigDecimal grossProfit = totalRevenue.subtract(totalCOGS);
+            response.setGrossProfit(grossProfit);
+
+            BigDecimal operatingExpenses = calculateTotalExpenses(startDate, endDate);
+            response.setExpenses(operatingExpenses);
+
+            BigDecimal netProfit = grossProfit
+                    .add(response.getOtherIncome())
+                    .subtract(operatingExpenses)
+                    .subtract(response.getOtherExpenses());
+            response.setNetProfit(netProfit);
+
+            if (totalRevenue.compareTo(BigDecimal.ZERO) != 0) {
+                response.setGrossMarginPercentage(
+                        grossProfit.divide(totalRevenue, 4, RoundingMode.HALF_UP));
+                response.setNetProfitPercentage(
+                        netProfit.divide(totalRevenue, 4, RoundingMode.HALF_UP));
+            } else {
+                response.setGrossMarginPercentage(BigDecimal.ZERO);
+                response.setNetProfitPercentage(BigDecimal.ZERO);
+            }
+
+            return response;
+        } catch (Exception e) {
+            logger.error("Error generating profit/loss report: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to generate profit/loss report: " + e.getMessage(), e);
+        }
     }
 
     @Override
@@ -935,16 +892,12 @@ public class ReportServiceImpl implements ReportService {
         int rowNum = 1;
         createRow(sheet, rowNum++, "Period Start", data.getPeriodStart().toString());
         createRow(sheet, rowNum++, "Period End", data.getPeriodEnd().toString());
-        createRow(sheet, rowNum++, "Gross Sales", data.getTotalRevenue());
-        createRow(sheet, rowNum++, "Beginning Inventory", data.getBeginningInventory());
-        createRow(sheet, rowNum++, "Purchases", data.getPurchases());
-        createRow(sheet, rowNum++, "Ending Inventory", data.getEndingInventory());
+        createRow(sheet, rowNum++, "Total Revenue", data.getTotalRevenue());
         createRow(sheet, rowNum++, "Cost of Goods Sold", data.getTotalCost());
         createRow(sheet, rowNum++, "Gross Profit", data.getGrossProfit());
         createRow(sheet, rowNum++, "Operating Expenses", data.getExpenses());
         createRow(sheet, rowNum++, "Other Income", data.getOtherIncome());
         createRow(sheet, rowNum++, "Other Expenses", data.getOtherExpenses());
-        createRow(sheet, rowNum++, "Taxes", data.getTaxes());
         createRow(sheet, rowNum++, "Net Profit", data.getNetProfit());
         createRow(sheet, rowNum++, "Gross Margin %", data.getGrossMarginPercentage().multiply(BigDecimal.valueOf(100)));
         createRow(sheet, rowNum++, "Net Profit %", data.getNetProfitPercentage().multiply(BigDecimal.valueOf(100)));
