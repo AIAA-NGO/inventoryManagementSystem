@@ -28,6 +28,7 @@ public class SaleServiceImpl implements SaleService {
     private final CustomerRepository customerRepository;
     private final DiscountRepository discountRepository;
     private final ModelMapper modelMapper;
+    
 
     @Override
     @Transactional
