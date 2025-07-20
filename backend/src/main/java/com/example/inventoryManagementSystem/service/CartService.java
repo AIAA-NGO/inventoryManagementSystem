@@ -13,6 +13,7 @@ public interface CartService {
     CartResponse updateItemQuantity(String username, Long productId, int quantity);
     CartResponse removeItemFromCart(String username, Long productId);
     CartResponse applyDiscount(String username, String discountCode);
+    CartResponse removeDiscount(String username);
     void clearCart(String username);
     CartItemResponse updateCartItemQuantity(String username, Long productId, int quantity);
 }

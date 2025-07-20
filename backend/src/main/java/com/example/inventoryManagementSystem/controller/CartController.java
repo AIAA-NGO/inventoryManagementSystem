@@ -92,8 +92,8 @@ public class CartController {
         SaleRequest saleRequest = new SaleRequest();
         saleRequest.setCustomerId(request.getCustomerId());
         saleRequest.setItems(saleItems);
-        saleRequest.setSubtotal(cart.getSubtotal());
-        saleRequest.setDiscountAmount(cart.getDiscountAmount());
+        saleRequest.setSubtotal(cart.getPreTaxSubtotal());  // Changed from getSubtotal()
+        saleRequest.setDiscountAmount(cart.getTotalDiscountAmount()); // Changed from getDiscountAmount()
         saleRequest.setTotal(cart.getTotal());
 
         SaleResponse response = saleService.createSale(saleRequest);
