@@ -12,11 +12,6 @@ public class CartItemResponse {
     private String productName;
     private int quantity;
     private BigDecimal unitPrice;
-    private BigDecimal discountPercentage;
     private BigDecimal totalPrice;
     private BigDecimal discountAmount;
-
-    public BigDecimal getDiscountAmount() {
-        return discountAmount;
-    }
 }

@@ -35,6 +35,9 @@ public class Purchase {
     @Column(name = "total_amount", precision = 19, scale = 2)
     private BigDecimal totalAmount;
 
+    @Column(name = "tax_amount", precision = 19, scale = 2)
+    private BigDecimal taxAmount;
+
     @Column(name = "discount_amount", precision = 19, scale = 2)
     private BigDecimal discountAmount;
 

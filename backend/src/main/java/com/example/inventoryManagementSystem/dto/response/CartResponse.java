@@ -9,13 +9,11 @@ import java.util.List;
 @Data
 @Builder
 public class CartResponse {
+    private Long cartId;
     private List<CartItemResponse> items;
-    private BigDecimal preTaxSubtotal;
-    private BigDecimal productDiscountAmount;
-    private BigDecimal cartDiscountAmount;
-    private BigDecimal totalDiscountAmount;
-    private BigDecimal taxableAmount;
+    private BigDecimal subtotal;      // tax-exclusive amount
+    private BigDecimal discountAmount;
     private BigDecimal taxAmount;
-    private BigDecimal total;
-    private String appliedDiscountCode;
+    private BigDecimal total;        // tax-inclusive amount
+    private BigDecimal preTaxAmount; // same as subtotal (for internal use)
 }

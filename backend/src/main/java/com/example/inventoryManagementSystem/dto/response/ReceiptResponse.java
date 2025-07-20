@@ -1,5 +1,6 @@
 package com.example.inventoryManagementSystem.dto.response;
 
+import com.example.inventoryManagementSystem.model.ReceiptItem;
 import lombok.Builder;
 import lombok.Data;
 
@@ -13,11 +14,11 @@ public class ReceiptResponse {
     private String receiptNumber;
     private LocalDateTime date;
     private String customerName;
-    private List<ReceiptItemResponse> items;
+    private List<ReceiptItem> items;
     private BigDecimal subtotal;
     private BigDecimal discountAmount;
     private BigDecimal taxAmount;
     private BigDecimal total;
-    private String paymentMethod;
-    private String appliedDiscountCode;
+    private BigDecimal preTaxAmount;
+    private BigDecimal totalProfit;
 }

@@ -21,7 +21,4 @@ public class SaleRequest {
     private BigDecimal taxAmount;
     private BigDecimal discountAmount;
     private BigDecimal total;
-
-    private String paymentMethod;          // Add this field
-    private String appliedDiscountCode;    // Add this field
 }

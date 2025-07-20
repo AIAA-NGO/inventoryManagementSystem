@@ -5,7 +5,9 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 
+
 @Entity
+@Table(name = "sale_items")
 @Data
 public class SaleItem {
     @Id
@@ -16,25 +18,26 @@ public class SaleItem {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
-    @Column(nullable = false)
     private int quantity;
 
-    @Column(name = "unit_price", precision = 19, scale = 2, nullable = false)
+    @Column(name = "unit_price", precision = 19, scale = 2)
     private BigDecimal unitPrice;
 
-    @Column(name = "discount_amount", precision = 19, scale = 2, nullable = false)
-    private BigDecimal discountAmount = BigDecimal.ZERO;
-
-    @Column(name = "total_price", precision = 19, scale = 2, nullable = false)
+    @Column(name = "total_price", precision = 19, scale = 2)
     private BigDecimal totalPrice;
-
-    @Column(name = "cost_amount", precision = 19, scale = 2)
-    private BigDecimal costAmount;
-
-    @Column(name = "profit_amount", precision = 19, scale = 2)
-    private BigDecimal profitAmount;
 
     @ManyToOne
     @JoinColumn(name = "sale_id", nullable = false)
     private Sale sale;
+
+
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+    public BigDecimal getDiscountAmount() {
+        return discountAmount;
+    }
+
+    public void setDiscountAmount(BigDecimal discountAmount) {
+        this.discountAmount = discountAmount;
+    }
+
 }
