@@ -23,4 +23,5 @@ public class SaleResponse {
     private BigDecimal profit;
     private String paymentMethod;
     private String transactionReference;
+    private String appliedDiscountCode;
 }

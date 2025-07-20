@@ -33,6 +33,7 @@ public class CartServiceImpl implements CartService {
     private static class UserCart {
         Map<Long, CartItemResponse> items = new ConcurrentHashMap<>();
         String appliedDiscountCode;
+        BigDecimal cartDiscountPercentage = BigDecimal.ZERO;
         BigDecimal cartDiscountAmount = BigDecimal.ZERO;
     }
 
@@ -40,62 +41,6 @@ public class CartServiceImpl implements CartService {
         return userCarts.computeIfAbsent(username, k -> new UserCart());
     }
 
-    // Helper methods defined first
-    private BigDecimal calculatePreTaxSubtotal(List<CartItemResponse> items) {
-        return items.stream()
-                .map(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private BigDecimal calculateProductDiscounts(List<CartItemResponse> items) {
-        return items.stream()
-                .map(CartItemResponse::getDiscountAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private BigDecimal calculateTax(BigDecimal taxableAmount) {
-        return taxableAmount.multiply(TAX_RATE)
-                .setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private BigDecimal calculateMaxDiscount(BigDecimal itemPrice, List<Discount> discounts) {
-        return discounts.stream()
-                .map(d -> itemPrice.multiply(BigDecimal.valueOf(d.getPercentage() / 100)))
-                .max(BigDecimal::compareTo)
-                .orElse(BigDecimal.ZERO);
-    }
-
-    private void validateQuantitiesAgainstStock(String username, List<CartItemRequest> requests) {
-        UserCart userCart = getUserCart(username);
-        Map<Long, Integer> requestedQuantities = requests.stream()
-                .collect(Collectors.groupingBy(
-                        CartItemRequest::getProductId,
-                        Collectors.summingInt(CartItemRequest::getQuantity)
-                ));
-
-        for (Map.Entry<Long, Integer> entry : requestedQuantities.entrySet()) {
-            Long productId = entry.getKey();
-            int requestedQuantity = entry.getValue();
-
-            Product product = productRepository.findById(productId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
-
-            int currentQuantityInCart = userCart.items.containsKey(productId) ?
-                    userCart.items.get(productId).getQuantity() : 0;
-            int totalQuantityAfterAddition = currentQuantityInCart + requestedQuantity;
-
-            if (totalQuantityAfterAddition > product.getQuantityInStock()) {
-                throw new BusinessException(String.format(
-                        "Cannot add %d items of product '%s' to cart. Only %d items available in stock. You already have %d in your cart.",
-                        requestedQuantity, product.getName(), product.getQuantityInStock(), currentQuantityInCart
-                ));
-            }
-        }
-    }
-
-    // Main implementation methods
     @Override
     public CartResponse getCart(String username) {
         UserCart userCart = getUserCart(username);
@@ -103,20 +48,19 @@ public class CartServiceImpl implements CartService {
 
         BigDecimal preTaxSubtotal = calculatePreTaxSubtotal(items);
         BigDecimal productDiscounts = calculateProductDiscounts(items);
-        BigDecimal preTaxAmountAfterProductDiscounts = preTaxSubtotal.subtract(productDiscounts);
-        BigDecimal cartDiscountAmount = userCart.cartDiscountAmount;
-        BigDecimal preTaxAmountAfterAllDiscounts = preTaxAmountAfterProductDiscounts.subtract(cartDiscountAmount);
-        BigDecimal taxAmount = calculateTax(preTaxAmountAfterAllDiscounts);
-        BigDecimal total = preTaxAmountAfterAllDiscounts.add(taxAmount);
-        BigDecimal totalDiscountAmount = productDiscounts.add(cartDiscountAmount);
+        BigDecimal amountAfterProductDiscounts = preTaxSubtotal.subtract(productDiscounts);
+        BigDecimal cartDiscountAmount = calculateCartDiscount(amountAfterProductDiscounts, userCart.cartDiscountPercentage);
+        BigDecimal taxableAmount = amountAfterProductDiscounts.subtract(cartDiscountAmount);
+        BigDecimal taxAmount = calculateTax(taxableAmount);
+        BigDecimal total = taxableAmount.add(taxAmount);
 
         return CartResponse.builder()
                 .items(items)
                 .preTaxSubtotal(preTaxSubtotal)
                 .productDiscountAmount(productDiscounts)
                 .cartDiscountAmount(cartDiscountAmount)
-                .totalDiscountAmount(totalDiscountAmount)
-                .taxableAmount(preTaxAmountAfterAllDiscounts)
+                .totalDiscountAmount(productDiscounts.add(cartDiscountAmount))
+                .taxableAmount(taxableAmount)
                 .taxAmount(taxAmount)
                 .total(total)
                 .appliedDiscountCode(userCart.appliedDiscountCode)
@@ -124,9 +68,8 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
-    @Transactional
     public CartResponse addItemToCart(String username, CartItemRequest request) {
-        return addItemsToCart(username, Collections.singletonList(request));
+        return addItemsToCart(username, List.of(request));
     }
 
     @Override
@@ -135,56 +78,35 @@ public class CartServiceImpl implements CartService {
         UserCart userCart = getUserCart(username);
         validateQuantitiesAgainstStock(username, requests);
 
-        Map<Long, Integer> quantityMap = requests.stream()
-                .collect(Collectors.toMap(
-                        CartItemRequest::getProductId,
-                        CartItemRequest::getQuantity,
-                        Integer::sum
-                ));
+        for (CartItemRequest request : requests) {
+            Product product = productRepository.findById(request.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
 
-        quantityMap.forEach((productId, quantity) -> {
-            Product product = productRepository.findById(productId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
-
-            List<Discount> discounts = discountRepository.findActiveDiscountsForProduct(product);
+            BigDecimal maxDiscountPercentage = getMaxDiscountPercentageForProduct(product);
             BigDecimal unitPrice = BigDecimal.valueOf(product.getPrice());
-            BigDecimal itemDiscount = calculateMaxDiscount(unitPrice, discounts)
-                    .multiply(BigDecimal.valueOf(quantity));
 
-            CartItemResponse existingItem = userCart.items.get(productId);
-
+            CartItemResponse existingItem = userCart.items.get(product.getId());
             if (existingItem != null) {
-                int newQuantity = existingItem.getQuantity() + quantity;
-                existingItem.setQuantity(newQuantity);
-                existingItem.setTotalPrice(unitPrice.multiply(BigDecimal.valueOf(newQuantity)));
-                existingItem.setDiscountAmount(
-                        calculateMaxDiscount(unitPrice, discounts)
-                                .multiply(BigDecimal.valueOf(newQuantity))
-                );
+                updateExistingCartItem(existingItem, request.getQuantity(), maxDiscountPercentage);
             } else {
-                CartItemResponse newItem = CartItemResponse.builder()
-                        .productId(productId)
-                        .productName(product.getName())
-                        .quantity(quantity)
-                        .unitPrice(unitPrice)
-                        .totalPrice(unitPrice.multiply(BigDecimal.valueOf(quantity)))
-                        .discountAmount(itemDiscount)
-                        .build();
-                userCart.items.put(productId, newItem);
+                addNewCartItem(userCart, product, request.getQuantity(), maxDiscountPercentage, unitPrice);
             }
-        });
-
-        if (userCart.appliedDiscountCode != null) {
-            return applyDiscount(username, userCart.appliedDiscountCode);
         }
 
         return getCart(username);
     }
 
     @Override
+    public CartResponse updateItemQuantity(String username, Long productId, int quantity) {
+        updateCartItemQuantity(username, productId, quantity);
+        return getCart(username);
+    }
+
+    @Override
     public CartItemResponse updateCartItemQuantity(String username, Long productId, int newQuantity) {
         UserCart userCart = getUserCart(username);
-        if (!userCart.items.containsKey(productId)) {
+        CartItemResponse item = userCart.items.get(productId);
+        if (item == null) {
             throw new ResourceNotFoundException("Cart item not found");
         }
 
@@ -198,70 +120,33 @@ public class CartServiceImpl implements CartService {
             ));
         }
 
-        List<Discount> discounts = discountRepository.findActiveDiscountsForProduct(product);
-        BigDecimal unitPrice = BigDecimal.valueOf(product.getPrice());
-        BigDecimal itemDiscount = calculateMaxDiscount(unitPrice, discounts)
-                .multiply(BigDecimal.valueOf(newQuantity));
-
-        CartItemResponse item = userCart.items.get(productId);
-        item.setQuantity(newQuantity);
-        item.setTotalPrice(unitPrice.multiply(BigDecimal.valueOf(newQuantity)));
-        item.setDiscountAmount(itemDiscount);
-
-        if (userCart.appliedDiscountCode != null) {
-            applyDiscount(username, userCart.appliedDiscountCode);
-        }
+        BigDecimal maxDiscountPercentage = getMaxDiscountPercentageForProduct(product);
+        updateExistingCartItem(item, newQuantity - item.getQuantity(), maxDiscountPercentage);
 
         return item;
-    }
-
-    @Override
-    public CartResponse updateItemQuantity(String username, Long productId, int quantity) {
-        updateCartItemQuantity(username, productId, quantity);
-        return getCart(username);
     }
 
     @Override
     public CartResponse removeItemFromCart(String username, Long productId) {
         UserCart userCart = getUserCart(username);
         userCart.items.remove(productId);
-
-        if (userCart.appliedDiscountCode != null) {
-            return applyDiscount(username, userCart.appliedDiscountCode);
-        }
-
         return getCart(username);
     }
 
     @Override
     public CartResponse applyDiscount(String username, String discountCode) {
         UserCart userCart = getUserCart(username);
-
         if (discountCode == null || discountCode.isEmpty()) {
-            userCart.appliedDiscountCode = null;
-            userCart.cartDiscountAmount = BigDecimal.ZERO;
-            return getCart(username);
+            return removeDiscount(username);
         }
 
         Discount discount = discountRepository.findByCode(discountCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Discount not found"));
 
-        if (!discount.isActive() ||
-                (discount.getValidFrom() != null && discount.getValidFrom().isAfter(LocalDateTime.now())) ||
-                (discount.getValidTo() != null && discount.getValidTo().isBefore(LocalDateTime.now()))) {
-            throw new BusinessException("Discount is not valid");
-        }
-
-        BigDecimal preTaxSubtotal = calculatePreTaxSubtotal(new ArrayList<>(userCart.items.values()));
-        BigDecimal productDiscounts = calculateProductDiscounts(new ArrayList<>(userCart.items.values()));
-        BigDecimal preTaxAmountAfterProductDiscounts = preTaxSubtotal.subtract(productDiscounts);
-
-        BigDecimal cartDiscountAmount = preTaxAmountAfterProductDiscounts
-                .multiply(BigDecimal.valueOf(discount.getPercentage() / 100));
+        validateDiscount(discount);
 
         userCart.appliedDiscountCode = discountCode;
-        userCart.cartDiscountAmount = cartDiscountAmount;
-
+        userCart.cartDiscountPercentage = BigDecimal.valueOf(discount.getPercentage());
         return getCart(username);
     }
 
@@ -269,6 +154,7 @@ public class CartServiceImpl implements CartService {
     public CartResponse removeDiscount(String username) {
         UserCart userCart = getUserCart(username);
         userCart.appliedDiscountCode = null;
+        userCart.cartDiscountPercentage = BigDecimal.ZERO;
         userCart.cartDiscountAmount = BigDecimal.ZERO;
         return getCart(username);
     }
@@ -278,6 +164,102 @@ public class CartServiceImpl implements CartService {
         UserCart userCart = getUserCart(username);
         userCart.items.clear();
         userCart.appliedDiscountCode = null;
+        userCart.cartDiscountPercentage = BigDecimal.ZERO;
         userCart.cartDiscountAmount = BigDecimal.ZERO;
+    }
+
+    private void validateQuantitiesAgainstStock(String username, List<CartItemRequest> requests) {
+        UserCart userCart = getUserCart(username);
+
+        for (CartItemRequest request : requests) {
+            Product product = productRepository.findById(request.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+
+            CartItemResponse existingItem = userCart.items.get(request.getProductId());
+            int totalQuantity = request.getQuantity() + (existingItem != null ? existingItem.getQuantity() : 0);
+
+            if (product.getQuantityInStock() < totalQuantity) {
+                throw new BusinessException(String.format(
+                        "Not enough stock available for product '%s'. Only %d items available.",
+                        product.getName(), product.getQuantityInStock()
+                ));
+            }
+        }
+    }
+
+    private BigDecimal getMaxDiscountPercentageForProduct(Product product) {
+        List<Discount> discounts = discountRepository.findActiveDiscountsForProduct(product);
+        return discounts.stream()
+                .map(Discount::getPercentage)
+                .max(Comparator.naturalOrder())
+                .map(BigDecimal::valueOf)
+                .orElse(BigDecimal.ZERO);
+    }
+
+    private void updateExistingCartItem(CartItemResponse item, int quantityToAdd, BigDecimal maxDiscountPercentage) {
+        item.setQuantity(item.getQuantity() + quantityToAdd);
+        item.setDiscountPercentage(maxDiscountPercentage);
+        item.setTotalPrice(calculateItemTotalPrice(
+                item.getUnitPrice(),
+                item.getQuantity(),
+                maxDiscountPercentage
+        ));
+    }
+
+    private void addNewCartItem(UserCart userCart, Product product, int quantity,
+                                BigDecimal maxDiscountPercentage, BigDecimal unitPrice) {
+        CartItemResponse newItem = CartItemResponse.builder()
+                .productId(product.getId())
+                .productName(product.getName())
+                .quantity(quantity)
+                .unitPrice(unitPrice)
+                .discountPercentage(maxDiscountPercentage)
+                .totalPrice(calculateItemTotalPrice(unitPrice, quantity, maxDiscountPercentage))
+                .build();
+        userCart.items.put(product.getId(), newItem);
+    }
+
+    private BigDecimal calculateItemTotalPrice(BigDecimal unitPrice, int quantity, BigDecimal discountPercentage) {
+        return unitPrice.multiply(BigDecimal.valueOf(quantity))
+                .multiply(BigDecimal.ONE.subtract(discountPercentage.divide(BigDecimal.valueOf(100))));
+    }
+
+    private BigDecimal calculatePreTaxSubtotal(List<CartItemResponse> items) {
+        return items.stream()
+                .map(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal calculateProductDiscounts(List<CartItemResponse> items) {
+        return items.stream()
+                .map(item -> item.getUnitPrice()
+                        .multiply(BigDecimal.valueOf(item.getQuantity()))
+                        .multiply(item.getDiscountPercentage().divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)))
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal calculateCartDiscount(BigDecimal amountAfterProductDiscounts, BigDecimal cartDiscountPercentage) {
+        return amountAfterProductDiscounts
+                .multiply(cartDiscountPercentage.divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP))
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal calculateTax(BigDecimal taxableAmount) {
+        return taxableAmount.multiply(TAX_RATE)
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private void validateDiscount(Discount discount) {
+        if (!discount.isActive() ||
+                (discount.getValidFrom() != null && discount.getValidFrom().isAfter(LocalDateTime.now())) ||
+                (discount.getValidTo() != null && discount.getValidTo().isBefore(LocalDateTime.now()))) {
+            throw new BusinessException("Discount is not valid");
+        }
+
+        if (discount.getType() != Discount.DiscountType.CART) {
+            throw new BusinessException("This is a product discount, not a cart discount");
+        }
     }
 }

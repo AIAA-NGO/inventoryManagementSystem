@@ -32,11 +32,23 @@ public class Sale {
     @Column(name = "discount_amount", precision = 19, scale = 2, nullable = false)
     private BigDecimal discountAmount = BigDecimal.ZERO;
 
+    @Column(name = "tax_amount", precision = 19, scale = 2, nullable = false)
+    private BigDecimal taxAmount = BigDecimal.ZERO;
+
     @Column(name = "total", precision = 19, scale = 2, nullable = false)
     private BigDecimal total = BigDecimal.ZERO;
 
     @Column(name = "profit", precision = 19, scale = 2, nullable = false)
     private BigDecimal profit = BigDecimal.ZERO;
+
+    @Column(name = "payment_method")
+    private String paymentMethod;
+
+    @Column(name = "applied_discount_code")
+    private String appliedDiscountCode;
+
+    @Column(name = "payment_details")
+    private String paymentDetails;
 
     @OneToMany(mappedBy = "sale", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     private List<SaleItem> items = new ArrayList<>();
@@ -57,7 +69,8 @@ public class Sale {
                 .map(SaleItem::getDiscountAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        this.total = subtotal.subtract(discountAmount);
+        this.taxAmount = subtotal.subtract(discountAmount).multiply(new BigDecimal("0.16"));
+        this.total = subtotal.subtract(discountAmount).add(taxAmount);
 
         this.profit = items.stream()
                 .map(item -> {
@@ -65,12 +78,8 @@ public class Sale {
                             .multiply(BigDecimal.valueOf(item.getQuantity()));
                     BigDecimal cost = BigDecimal.valueOf(item.getProduct().getCostPrice())
                             .multiply(BigDecimal.valueOf(item.getQuantity()));
-                    return revenue.subtract(cost);
+                    return revenue.subtract(cost).subtract(item.getDiscountAmount());
                 })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    public BigDecimal getTotalAmount() {
-        return this.total;
     }
 }

@@ -84,7 +84,7 @@ public class CartController {
                     saleItem.setProductId(item.getProductId());
                     saleItem.setQuantity(item.getQuantity());
                     saleItem.setUnitPrice(item.getUnitPrice());
-                    saleItem.setDiscountAmount(item.getDiscountAmount());
+                    saleItem.setDiscountAmount(item.getDiscountAmount()); // Make sure CartItemResponse has this method
                     return saleItem;
                 })
                 .collect(Collectors.toList());
@@ -92,9 +92,11 @@ public class CartController {
         SaleRequest saleRequest = new SaleRequest();
         saleRequest.setCustomerId(request.getCustomerId());
         saleRequest.setItems(saleItems);
-        saleRequest.setSubtotal(cart.getPreTaxSubtotal());  // Changed from getSubtotal()
-        saleRequest.setDiscountAmount(cart.getTotalDiscountAmount()); // Changed from getDiscountAmount()
+        saleRequest.setSubtotal(cart.getPreTaxSubtotal());
+        saleRequest.setDiscountAmount(cart.getTotalDiscountAmount()); // Using cart's total discount
         saleRequest.setTotal(cart.getTotal());
+        saleRequest.setPaymentMethod(request.getPaymentMethod()); // Add if needed
+        saleRequest.setAppliedDiscountCode(request.getAppliedDiscountCode()); // Add if needed
 
         SaleResponse response = saleService.createSale(saleRequest);
         cartService.clearCart(username);

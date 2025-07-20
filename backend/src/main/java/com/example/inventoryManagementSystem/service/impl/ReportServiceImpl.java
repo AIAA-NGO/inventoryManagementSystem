@@ -369,7 +369,7 @@ public class ReportServiceImpl implements ReportService {
         BigDecimal salesRevenue = saleRepository.findBySaleDateBetween(startDateTime, endDateTime)
                 .stream()
                 .filter(sale -> sale.getStatus() == Sale.SaleStatus.COMPLETED)
-                .map(Sale::getTotalAmount)
+                .map(Sale::getTotal)  // Changed from getTotalAmount() to getTotal()
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         response.setCashInflows(salesRevenue);

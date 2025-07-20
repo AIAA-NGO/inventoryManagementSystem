@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -31,9 +32,10 @@ public class DiscountController {
         discount.setDescription(request.getDescription());
 
         Set<Product> products = request.getProductIds().stream()
-                .map(id -> productRepository.findById(id)
-                        .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id)))
-                .collect(Collectors.toSet());
+                .map(productRepository::findById)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .collect(Collectors.toSet()); // Changed to Set
 
         discount.setApplicableProducts(products);
         return ResponseEntity.ok(discountRepository.save(discount));

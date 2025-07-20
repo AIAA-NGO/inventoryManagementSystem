@@ -13,4 +13,14 @@ public class CheckoutRequest {
 
     @NotBlank
     private String paymentMethod;
+    private String appliedDiscountCode;
+
+    // Add getter and setter
+    public String getAppliedDiscountCode() {
+        return appliedDiscountCode;
+    }
+
+    public void setAppliedDiscountCode(String appliedDiscountCode) {
+        this.appliedDiscountCode = appliedDiscountCode;
+    }
 }
