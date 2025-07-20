@@ -13,14 +13,10 @@ public class ReceiptItem {
     private BigDecimal unitPrice;
     private BigDecimal totalPrice;
 
-    private BigDecimal preTaxAmount;
     private BigDecimal taxAmount;
     private BigDecimal discountAmount;
 
 
     private BigDecimal costAmount;
     private BigDecimal profitAmount;
-
-
-
 }

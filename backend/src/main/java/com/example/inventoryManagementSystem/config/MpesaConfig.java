@@ -22,7 +22,7 @@ public class MpesaConfig{
     private String consumerSecret;
     private String passkey;
     private String shortcode;
-    private String environment; // sandbox or production
+    private String environment;
     private String callbackUrl;
     private String confirmationUrl;
     private String validationUrl;

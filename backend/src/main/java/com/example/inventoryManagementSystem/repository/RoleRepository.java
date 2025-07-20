@@ -28,10 +28,7 @@ public interface RoleRepository extends JpaRepository<Role, Integer> {
             nativeQuery = true)
     int countStandardRoles();
 
-//    @EntityGraph(attributePaths = "permissions")
-//    Optional<Role> findByIdWithPermissions(Integer roleId);
-//
-//    Optional<Role> findByName(Role.ERole name);
+;
 
     @EntityGraph(attributePaths = "permissions")
     Optional<Role> findWithPermissionsById(Integer id);

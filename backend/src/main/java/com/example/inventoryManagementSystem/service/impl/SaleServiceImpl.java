@@ -28,7 +28,6 @@ public class SaleServiceImpl implements SaleService {
     private final CustomerRepository customerRepository;
     private final DiscountRepository discountRepository;
     private final ModelMapper modelMapper;
-    
 
     @Override
     @Transactional
@@ -47,13 +46,13 @@ public class SaleServiceImpl implements SaleService {
         // Calculate subtotal (sum of all item prices without discount)
         BigDecimal subtotal = calculateSubtotal(saleItems);
 
-        // Calculate total discount
-        BigDecimal discountAmount = calculateAutomaticDiscounts(saleItems);
+        // Calculate total discount (sum of all item-level discounts)
+        BigDecimal discountAmount = calculateTotalDiscount(saleItems);
 
-        // Calculate total (subtotal - discount)
-        BigDecimal total = subtotal.subtract(discountAmount);
+        // Calculate total (sum of all item prices after discounts)
+        BigDecimal total = calculateTotalAfterDiscounts(saleItems);
 
-        // Calculate profit (sum of (selling price - cost price) for each item)
+        // Calculate profit (sum of (selling price - cost price) for each item, after discounts)
         BigDecimal profit = calculateSaleProfit(saleItems);
 
         sale.setSubtotal(subtotal);
@@ -201,7 +200,7 @@ public class SaleServiceImpl implements SaleService {
                 .collect(Collectors.toList());
 
         BigDecimal totalRevenue = sales.stream()
-                .map(Sale::getSubtotal)
+                .map(Sale::getTotal) // Now using total (after discounts) for revenue
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal totalDiscount = sales.stream()
@@ -234,13 +233,22 @@ public class SaleServiceImpl implements SaleService {
         Discount discount = discountRepository.findByCode(request.getDiscountCode())
                 .orElseThrow(() -> new ResourceNotFoundException("Discount not found"));
 
-        BigDecimal discountAmount = sale.getSubtotal()
+        // Calculate additional discount amount
+        BigDecimal additionalDiscount = sale.getSubtotal()
                 .multiply(BigDecimal.valueOf(discount.getPercentage() / 100));
 
-        sale.setDiscountAmount(discountAmount);
-        sale.setTotal(sale.getSubtotal().subtract(discountAmount));
-        Sale updatedSale = saleRepository.save(sale);
+        // Update sale with additional discount
+        BigDecimal newDiscountAmount = sale.getDiscountAmount().add(additionalDiscount);
+        BigDecimal newTotal = sale.getSubtotal().subtract(newDiscountAmount);
 
+        sale.setDiscountAmount(newDiscountAmount);
+        sale.setTotal(newTotal);
+
+        // Update profit considering the additional discount
+        BigDecimal newProfit = sale.getProfit().subtract(additionalDiscount);
+        sale.setProfit(newProfit);
+
+        Sale updatedSale = saleRepository.save(sale);
         return mapToSaleResponse(updatedSale);
     }
 
@@ -254,7 +262,7 @@ public class SaleServiceImpl implements SaleService {
                     BigDecimal itemRevenue = item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
                     BigDecimal itemCost = BigDecimal.valueOf(item.getProduct().getCostPrice())
                             .multiply(BigDecimal.valueOf(item.getQuantity()));
-                    BigDecimal itemProfit = itemRevenue.subtract(itemCost);
+                    BigDecimal itemProfit = itemRevenue.subtract(itemCost).subtract(item.getDiscountAmount());
 
                     return ReceiptItem.builder()
                             .productName(item.getProduct().getName())
@@ -318,7 +326,8 @@ public class SaleServiceImpl implements SaleService {
         return sale.getItems().stream()
                 .map(item -> {
                     BigDecimal revenue = item.getUnitPrice()
-                            .multiply(BigDecimal.valueOf(item.getQuantity()));
+                            .multiply(BigDecimal.valueOf(item.getQuantity()))
+                            .subtract(item.getDiscountAmount());
                     BigDecimal cost = BigDecimal.valueOf(item.getProduct().getCostPrice())
                             .multiply(BigDecimal.valueOf(item.getQuantity()));
                     return revenue.subtract(cost);
@@ -330,7 +339,8 @@ public class SaleServiceImpl implements SaleService {
         return items.stream()
                 .map(item -> {
                     BigDecimal revenue = item.getUnitPrice()
-                            .multiply(BigDecimal.valueOf(item.getQuantity()));
+                            .multiply(BigDecimal.valueOf(item.getQuantity()))
+                            .subtract(item.getDiscountAmount());
                     BigDecimal cost = BigDecimal.valueOf(item.getProduct().getCostPrice())
                             .multiply(BigDecimal.valueOf(item.getQuantity()));
                     return revenue.subtract(cost);
@@ -356,9 +366,15 @@ public class SaleServiceImpl implements SaleService {
             BigDecimal unitPrice = BigDecimal.valueOf(product.getPrice());
             saleItem.setUnitPrice(unitPrice);
             BigDecimal quantity = BigDecimal.valueOf(itemRequest.getQuantity());
-            saleItem.setTotalPrice(unitPrice.multiply(quantity));
+            BigDecimal totalPrice = unitPrice.multiply(quantity);
 
-            saleItem.setDiscountAmount(BigDecimal.ZERO);
+            // Apply discount to the item
+            List<Discount> discounts = findValidDiscountsForProduct(product);
+            BigDecimal discountAmount = calculateMaxDiscountForItem(totalPrice, discounts);
+            saleItem.setDiscountAmount(discountAmount);
+
+            // Set final price after discount
+            saleItem.setTotalPrice(totalPrice.subtract(discountAmount));
             saleItem.setSale(sale);
 
             return saleItem;
@@ -366,6 +382,18 @@ public class SaleServiceImpl implements SaleService {
     }
 
     private BigDecimal calculateSubtotal(List<SaleItem> items) {
+        return items.stream()
+                .map(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal calculateTotalDiscount(List<SaleItem> items) {
+        return items.stream()
+                .map(SaleItem::getDiscountAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal calculateTotalAfterDiscounts(List<SaleItem> items) {
         return items.stream()
                 .map(SaleItem::getTotalPrice)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -392,7 +420,7 @@ public class SaleServiceImpl implements SaleService {
                 .multiply(BigDecimal.valueOf(item.getQuantity()));
         BigDecimal cost = BigDecimal.valueOf(item.getProduct().getCostPrice())
                 .multiply(BigDecimal.valueOf(item.getQuantity()));
-        BigDecimal profit = revenue.subtract(cost);
+        BigDecimal profit = revenue.subtract(cost).subtract(item.getDiscountAmount());
 
         return SaleItemResponse.builder()
                 .productId(item.getProduct().getId())
@@ -404,17 +432,6 @@ public class SaleServiceImpl implements SaleService {
                 .profitAmount(profit)
                 .discountAmount(item.getDiscountAmount())
                 .build();
-    }
-
-    private BigDecimal calculateAutomaticDiscounts(List<SaleItem> saleItems) {
-        return saleItems.stream()
-                .map(item -> {
-                    List<Discount> discounts = findValidDiscountsForProduct(item.getProduct());
-                    BigDecimal maxDiscount = calculateMaxDiscountForItem(item.getTotalPrice(), discounts);
-                    item.setDiscountAmount(maxDiscount);
-                    return maxDiscount;
-                })
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private List<Discount> findValidDiscountsForProduct(Product product) {

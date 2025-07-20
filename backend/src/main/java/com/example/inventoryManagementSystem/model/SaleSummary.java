@@ -15,7 +15,6 @@ public class SaleSummary {
     private BigDecimal subtotal;
     private BigDecimal discountAmount;
     private LocalDateTime saleTime;
-    private BigDecimal preTaxAmount;
     private BigDecimal taxAmount;
     private BigDecimal profit;
 }
